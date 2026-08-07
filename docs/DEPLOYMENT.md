@@ -1,567 +1,701 @@
-# Mangal Superfoods Backend - Deployment Guide
+# Deployment Guide
 
-Complete guide for setting up, deploying, and running the Mangal Superfoods backend API.
+Complete guide for setting up, configuring, and deploying the Mangal Superfoods Express + Prisma backend API.
 
 ---
 
 ## Table of Contents
 
-1. [Development Setup](#development-setup)
-2. [Docker Environment](#docker-environment)
-3. [Database Setup](#database-setup)
-4. [S3 Storage Setup](#s3-storage-setup)
-5. [Environment Configuration](#environment-configuration)
-6. [Running the Server](#running-the-server)
-7. [Production Deployment](#production-deployment)
-8. [Monitoring & Logging](#monitoring--logging)
+1. [Environment Setup](#environment-setup)
+2. [Required Environment Variables](#required-environment-variables)
+3. [Local Development with Docker](#local-development-with-docker)
+4. [Database Setup and Migrations](#database-setup-and-migrations)
+5. [S3 Bucket Initialization](#s3-bucket-initialization)
+6. [Production Deployment](#production-deployment)
+7. [Verification and Testing](#verification-and-testing)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
-## Development Setup
+## Environment Setup
 
 ### Prerequisites
 
-- **Node.js:** v16+ (check with `node --version`)
-- **npm:** v7+ (check with `npm --version`)
-- **Docker:** v20+ for local database (optional, can use local PostgreSQL)
-- **Git:** For version control
+- **Node.js** >= 18.x
+- **npm** >= 9.x (or **bun** as the alternative package manager)
+- **Docker** and **Docker Compose** (for local development)
+- **PostgreSQL** client tools (for remote database connections, optional)
 
-### Quick Start (5 minutes)
+### Installation Steps
 
-```bash
-# 1. Clone the repository
-cd /path/to/mangal-superfoods-backend
+1. **Clone the repository** (if not already done):
+   ```bash
+   git clone <repository-url>
+   cd mangal-superfoods-backend
+   ```
 
-# 2. Install dependencies
-npm install
+2. **Install dependencies**:
+   ```bash
+   npm install
+   # This automatically runs `prisma generate` via postinstall
+   ```
 
-# 3. Start Docker containers (Postgres + LocalStack S3)
-docker-compose up -d
-
-# 4. Create and apply database migrations
-npm run prisma:migrate:dev --name init
-
-# 5. Seed database with sample data
-npm run db:seed
-
-# 6. Initialize S3 bucket and upload sample images
-npm run init:s3
-
-# 7. Start development server (with auto-reload)
-npm run dev
-```
-
-Server will be running at `http://localhost:4000`
+3. **Create environment configuration**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your values (see next section)
+   ```
 
 ---
 
-## Docker Environment
+## Required Environment Variables
 
-### docker-compose.yml
+All required environment variables must be set before running the application. A template is provided in `.env.example`.
 
-The project includes `docker-compose.yml` to spin up:
-- **PostgreSQL** on port 5432
-- **LocalStack** (AWS S3 emulator) on port 4566
+### Core Application Variables
 
-### Start Services
+| Variable | Type | Description | Example |
+|---|---|---|---|
+| `PORT` | integer | Port the Express server listens on | `4000` |
+| `FRONTEND_ORIGIN` | string | Comma-separated list of allowed CORS origins | `http://localhost:3000,https://example.com` |
+
+### Database Configuration
+
+| Variable | Type | Description | Example |
+|---|---|---|---|
+| `DATABASE_URL` | string | PostgreSQL connection string (libpq format) | `postgresql://user:password@localhost:6432/store?schema=public` |
+
+Connection string format:
+```
+postgresql://[user[:password]@][host[:port]][/dbname][?param=value...]
+```
+
+**Docker Compose defaults** (see [Local Development](#local-development-with-docker)):
+- Host: `localhost`
+- Port: `6432` (maps to container's `5432`)
+- User: `ravi`
+- Password: `ravi@2026`
+- Database: `mangal_superfoods_store`
+
+**Production**: Use a managed PostgreSQL service (AWS RDS, Google Cloud SQL, Heroku Postgres, etc.). Ensure SSL is enabled and the connection string includes `sslmode=require`:
+```
+postgresql://user:password@host:5432/dbname?sslmode=require
+```
+
+### WhatsApp OTP Configuration
+
+| Variable | Type | Description | Example |
+|---|---|---|---|
+| `WHAPI_BASE_URL` | string | WhatsApp API gateway base URL | `https://gate.whapi.cloud` |
+| `WHAPI_TOKEN` | string | Bearer token for whapi.cloud API authentication | `eyJ0eXAiOiJKV1QiLC...` |
+
+To obtain credentials:
+1. Sign up at [whapi.cloud](https://whapi.cloud)
+2. Create an API key from the dashboard
+3. Generate a Bearer token for your business phone number
+
+### S3-Compatible Object Storage
+
+| Variable | Type | Description | Example |
+|---|---|---|---|
+| `BUCKET_NAME` | string | S3 bucket name | `mangal-superfoods` |
+| `S3_ENDPOINT` | string | S3 endpoint URL (omit `/` at the end) | `https://s3.us-west-004.backblazeb2.com` |
+| `AWS_REGION` | string | AWS region code | `us-east-1` |
+| `AWS_ACCESS_KEY_ID` | string | S3 access key ID | `ABC123XYZ` |
+| `AWS_ACCESS_KEY` | string | S3 secret access key | `wJalrXUtnFEMI/K7MDENG...` |
+
+**S3 Configuration Notes**:
+- The app uses `forcePathStyle: true` for compatibility with LocalStack and Backblaze B2
+- Images are uploaded to S3 first, and the resulting URLs are stored in the `Product.images` array
+- For production, use AWS S3, Backblaze B2, or another S3-compatible provider
+
+### Example `.env` File
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-
-# Stop and remove volumes (reset database)
-docker-compose down -v
-```
-
-### Troubleshooting Docker
-
-```bash
-# Check if containers are running
-docker-compose ps
-
-# Rebuild containers
-docker-compose build
-
-# View PostgreSQL logs
-docker-compose logs postgres
-
-# View LocalStack logs
-docker-compose logs localstack
-```
-
----
-
-## Database Setup
-
-### PostgreSQL Connection
-
-**Development:**
-```
-postgresql://postgres:postgres@localhost:5432/mangal_superfoods
-```
-
-**Connection String Environment Variable:**
-```bash
-DATABASE_URL="postgresql://user:password@host:5432/database"
-```
-
-### Migrations
-
-Prisma migrations are version-controlled and repeatable.
-
-```bash
-# Create a new migration after schema changes
-npm run prisma:migrate:dev --name descriptive_name
-
-# Apply migrations (development)
-npm run prisma:migrate:dev
-
-# Apply migrations (production)
-npm run prisma:migrate:deploy
-
-# Reset database (DESTROYS DATA)
-npm run prisma:migrate:reset
-
-# View migration history
-npm run prisma:studio  # Opens GUI
-```
-
-### Seed Database
-
-Sample data is loaded from `mockdata/dummy_data.js`:
-
-```bash
-# Seed with dummy data
-npm run db:seed
-
-# Run seed manually
-node prisma/seed.mjs
-```
-
-**Seed includes:**
-- 5 sample users (with test mobile numbers)
-- 20 sample products (electronics + superfoods)
-- 5 sample coupons
-- 2 sample orders with items
-- 6 sample ratings
-
----
-
-## S3 Storage Setup
-
-### LocalStack S3 (Development)
-
-LocalStack emulates AWS S3 locally.
-
-```bash
-# Create bucket and upload sample images
-npm run init:s3
-
-# This script:
-# 1. Creates bucket named "mangal-superfoods"
-# 2. Uploads sample images from sampleimages/
-# 3. Outputs image URLs for testing
-```
-
-### S3 Configuration
-
-**Development (LocalStack):**
-```
-S3_ENDPOINT=http://localhost:4566
-BUCKET_NAME=mangal-superfoods
-AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=test
-AWS_ACCESS_KEY=test
-```
-
-**Production (AWS S3 or Backblaze B2):**
-```
-S3_ENDPOINT=https://s3.us-west-1.amazonaws.com  # AWS
-# OR
-S3_ENDPOINT=https://s3.us-west-004.backblazeb2.com  # Backblaze B2
-BUCKET_NAME=your-production-bucket
-AWS_REGION=us-west-1
-AWS_ACCESS_KEY_ID=your_access_key_id
-AWS_ACCESS_KEY=your_secret_access_key
-```
-
-### Manual S3 Testing
-
-```bash
-# List buckets
-aws s3 ls --endpoint-url http://localhost:4566
-
-# List objects in bucket
-aws s3 ls s3://mangal-superfoods --endpoint-url http://localhost:4566
-
-# Upload file manually
-aws s3 cp image.jpg s3://mangal-superfoods/ --endpoint-url http://localhost:4566
-```
-
----
-
-## Environment Configuration
-
-### .env File
-
-Create `.env` in the project root:
-
-```bash
-# Server
+# Core
 PORT=4000
-NODE_ENV=development
-
-# Frontend CORS
-FRONTEND_ORIGIN="http://localhost:3000,http://localhost:3001"
+FRONTEND_ORIGIN="http://localhost:3000"
 
 # Database
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/mangal_superfoods"
+DATABASE_URL="postgresql://ravi:ravi@2026@localhost:6432/mangal_superfoods_store?schema=public"
 
-# WhatsApp OTP (whapi.cloud)
+# WhatsApp OTP
 WHAPI_BASE_URL="https://gate.whapi.cloud"
-WHAPI_TOKEN="your_whapi_token_here"
+WHAPI_TOKEN="your-token-here"
 
 # S3 Storage
 BUCKET_NAME="mangal-superfoods"
+S3_ENDPOINT="https://s3.us-west-004.backblazeb2.com"
+AWS_REGION="us-east-1"
+AWS_ACCESS_KEY_ID="your-access-key"
+AWS_ACCESS_KEY="your-secret-key"
+```
+
+---
+
+## Local Development with Docker
+
+### Quick Start
+
+The `docker-compose.yml` file provides PostgreSQL and LocalStack (S3 emulator) for local development.
+
+1. **Start services**:
+   ```bash
+   docker-compose up -d
+   ```
+
+   This starts:
+   - **PostgreSQL 16** on `localhost:6432`
+   - **LocalStack** on `localhost:4566`
+
+2. **Verify services are running**:
+   ```bash
+   docker-compose ps
+   # Expected: localstack and postgres containers in "running" state
+   ```
+
+3. **Check container logs** (if needed):
+   ```bash
+   docker-compose logs postgres
+   docker-compose logs localstack
+   ```
+
+### Database Connection (Docker)
+
+The compose file creates:
+- **User**: `ravi`
+- **Password**: `ravi@2026`
+- **Database**: `mangal_superfoods_store`
+- **Port**: `6432` (host) → `5432` (container)
+
+Use this connection string in your `.env`:
+```
+DATABASE_URL="postgresql://ravi:ravi@2026@localhost:6432/mangal_superfoods_store?schema=public"
+```
+
+### S3 Configuration (Docker)
+
+LocalStack simulates S3 at `http://localhost:4566`.
+
+Update your `.env` for local development:
+```bash
+BUCKET_NAME="mangal-superfoods-bucket"
 S3_ENDPOINT="http://localhost:4566"
 AWS_REGION="us-east-1"
 AWS_ACCESS_KEY_ID="test"
 AWS_ACCESS_KEY="test"
 ```
 
-### Environment Variables Reference
+### Stopping Services
 
-| Variable | Type | Required | Example | Note |
-|----------|------|----------|---------|------|
-| PORT | number | No | 4000 | Server port (default 4000) |
-| NODE_ENV | string | No | development | dev/prod mode |
-| FRONTEND_ORIGIN | string | Yes | http://localhost:3000 | Comma-separated CORS origins |
-| DATABASE_URL | string | Yes | postgresql://... | Postgres connection string |
-| WHAPI_BASE_URL | string | No | https://gate.whapi.cloud | WhatsApp API base URL |
-| WHAPI_TOKEN | string | No | token_here | WhatsApp API token |
-| BUCKET_NAME | string | Yes | mangal-superfoods | S3 bucket name |
-| S3_ENDPOINT | string | Yes | http://localhost:4566 | S3 endpoint URL |
-| AWS_REGION | string | Yes | us-east-1 | AWS region |
-| AWS_ACCESS_KEY_ID | string | Yes | test | AWS access key |
-| AWS_ACCESS_KEY | string | Yes | test | AWS secret key |
+```bash
+docker-compose down
+```
+
+To also remove data volumes (reset databases):
+```bash
+docker-compose down -v
+```
 
 ---
 
-## Running the Server
+## Database Setup and Migrations
 
-### Development Mode (With Auto-Reload)
+### Initial Setup
+
+After starting Docker services and updating `.env`:
+
+1. **Generate Prisma client**:
+   ```bash
+   npm run prisma:generate
+   ```
+
+2. **Create and apply migrations**:
+   ```bash
+   npm run prisma:migrate:dev
+   ```
+
+   This will:
+   - Create a new migration (if needed)
+   - Apply all pending migrations to the database
+   - Generate the Prisma client
+
+3. **Verify schema was created**:
+   ```bash
+   npm run prisma:studio
+   ```
+
+   This opens an interactive UI at `http://localhost:5555` to inspect your database.
+
+### Migration Workflow
+
+#### Creating a New Migration (Development)
+
+When you modify `prisma/schema.prisma`:
 
 ```bash
-npm run dev
+npm run prisma:migrate:dev --name add_new_field
 ```
 
-- Watches file changes
-- Auto-restarts server
-- Debug-friendly error messages
-- Prisma client memoized for stability
+This will:
+1. Format the schema file
+2. Create a migration file in `prisma/migrations/`
+3. Apply the migration to your local database
+4. Regenerate the Prisma client
 
-### Production Mode
+#### Applying Migrations Without Creating (Development)
+
+To apply existing migrations (e.g., after pulling changes):
 
 ```bash
-npm start
+npm run prisma:migrate:dev
 ```
 
-- No auto-reload
-- Optimized for performance
-- Should run with process manager (PM2, systemd)
-
-### Health Check
+#### Applying Migrations in Production
 
 ```bash
-curl http://localhost:4000/health
-# Response: { "status": "ok" }
+npm run prisma:migrate:deploy
 ```
+
+**Important**: Always test migrations in a staging environment first.
+
+### Schema Introspection
+
+If you modify the database directly (not recommended), synchronize your schema:
+
+```bash
+npm run prisma:db:pull
+```
+
+This introspects the database and updates `prisma/schema.prisma`.
+
+### Seeding the Database
+
+To populate the database with sample data:
+
+```bash
+npm run db:seed
+```
+
+This runs `prisma/seed.mjs`, which:
+- Uses mock data from `mockdata/dummy_data.js`
+- Generates LocalStack S3 URLs for product images
+- Creates sample users, products, orders, and ratings
+
+---
+
+## S3 Bucket Initialization
+
+### For Local Development (LocalStack)
+
+1. **Ensure LocalStack container is running**:
+   ```bash
+   docker-compose ps | grep localstack
+   ```
+
+2. **Run the S3 initialization script**:
+   ```bash
+   npm run init:s3
+   ```
+
+   Or manually:
+   ```bash
+   ./init-s3.sh
+   ```
+
+   This script:
+   - Creates the S3 bucket (`mangal-superfoods-bucket` by default)
+   - Syncs sample images from `sampleimages/` into the bucket
+   - Verifies the bucket contents
+
+3. **Verify bucket was created**:
+   ```bash
+   docker exec ms_localstack awslocal s3 ls s3://mangal-superfoods-bucket --recursive
+   ```
+
+### For Production (AWS S3, Backblaze B2, etc.)
+
+1. **Create the bucket** in your S3 provider's console or CLI:
+   ```bash
+   aws s3 mb s3://mangal-superfoods --region us-east-1
+   ```
+
+2. **Configure bucket settings**:
+   - **CORS** (if frontend is on a different domain):
+     ```json
+     {
+       "CORSRules": [
+         {
+           "AllowedHeaders": ["*"],
+           "AllowedMethods": ["GET", "PUT", "POST"],
+           "AllowedOrigins": ["https://your-frontend-domain.com"],
+           "MaxAgeSeconds": 3000
+         }
+       ]
+     }
+     ```
+
+   - **Public Read Access** (if images should be publicly accessible):
+     ```json
+     {
+       "Version": "2012-10-17",
+       "Statement": [
+         {
+           "Sid": "PublicRead",
+           "Effect": "Allow",
+           "Principal": "*",
+           "Action": "s3:GetObject",
+           "Resource": "arn:aws:s3:::mangal-superfoods/*"
+         }
+       ]
+     }
+     ```
+
+3. **Set environment variables** with your S3 credentials in your production environment.
 
 ---
 
 ## Production Deployment
 
-### Recommended Stack
+### Pre-Deployment Checklist
 
-- **App Server:** Node.js on AWS EC2, Heroku, or similar
-- **Database:** AWS RDS PostgreSQL or managed provider
-- **Storage:** AWS S3, Backblaze B2, or Wasabi
-- **CDN:** CloudFront for images (optional)
-- **Process Manager:** PM2, systemd, or Docker
-- **Monitoring:** CloudWatch, DataDog, or New Relic
+- [ ] All environment variables are configured (see [Required Environment Variables](#required-environment-variables))
+- [ ] Database migrations have been tested in staging
+- [ ] S3 bucket is created and configured
+- [ ] CORS origins in `FRONTEND_ORIGIN` include your production frontend domain
+- [ ] WHAPI token is valid and has sufficient quota
+- [ ] Node.js >= 18.x is available on the deployment platform
+- [ ] Secrets (database URL, API keys, credentials) are stored securely (not in git)
 
-### Heroku Deployment
+### Deployment Options
 
-```bash
-# Create Heroku app
-heroku create mangal-superfoods-api
+#### Option 1: Traditional Server / VPS
 
-# Add PostgreSQL addon
-heroku addons:create heroku-postgresql:standard-0
+1. **SSH into your server**:
+   ```bash
+   ssh user@your-server.com
+   cd /var/www/mangal-superfoods-backend
+   ```
 
-# Set environment variables
-heroku config:set FRONTEND_ORIGIN="https://mangalsuperfoods.com"
-heroku config:set WHAPI_TOKEN="your_token"
-heroku config:set AWS_ACCESS_KEY_ID="..."
-heroku config:set AWS_ACCESS_KEY="..."
+2. **Pull the latest code**:
+   ```bash
+   git fetch origin
+   git checkout main
+   ```
 
-# Deploy
-git push heroku main
+3. **Install dependencies**:
+   ```bash
+   npm install --omit=dev
+   ```
 
-# View logs
-heroku logs --tail
-```
+4. **Update environment variables**:
+   ```bash
+   nano .env  # or your preferred editor
+   ```
 
-### Docker Deployment
+5. **Apply database migrations**:
+   ```bash
+   npm run prisma:migrate:deploy
+   ```
 
-**Build Docker image:**
-```dockerfile
-# Dockerfile
-FROM node:18-alpine
+6. **Start the server** (using a process manager like PM2 or systemd):
+   ```bash
+   pm2 start server.js --name "mangal-api"
+   pm2 save
+   pm2 startup
+   ```
 
-WORKDIR /app
+   Or with systemd:
+   ```bash
+   sudo systemctl start mangal-superfoods-backend
+   ```
 
-COPY package*.json ./
-RUN npm install --only=production
+#### Option 2: Docker Container
 
-COPY . .
+1. **Build the Docker image**:
+   ```bash
+   docker build -t mangal-superfoods-backend:latest .
+   ```
 
-EXPOSE 4000
+   Example `Dockerfile`:
+   ```dockerfile
+   FROM node:18-alpine
+   WORKDIR /app
+   COPY package*.json ./
+   RUN npm install --omit=dev
+   COPY . .
+   RUN npm run prisma:generate
+   EXPOSE 4000
+   CMD ["npm", "start"]
+   ```
 
-CMD ["npm", "start"]
-```
+2. **Push to a container registry** (Docker Hub, ECR, etc.):
+   ```bash
+   docker tag mangal-superfoods-backend:latest your-registry/mangal-superfoods-backend:latest
+   docker push your-registry/mangal-superfoods-backend:latest
+   ```
 
-**Build and run:**
-```bash
-# Build image
-docker build -t mangal-superfoods-api .
+3. **Deploy using Docker Compose or Kubernetes** with your environment variables and mounted volumes for database and S3 configs.
 
-# Run container
-docker run -p 4000:4000 \
-  -e DATABASE_URL="postgresql://..." \
-  -e FRONTEND_ORIGIN="https://mangalsuperfoods.com" \
-  -e AWS_ACCESS_KEY_ID="..." \
-  -e AWS_ACCESS_KEY="..." \
-  mangal-superfoods-api
-```
+#### Option 3: Heroku / Platform-as-a-Service
 
-### Environment-Specific .env Files
+1. **Create a Procfile**:
+   ```
+   web: npm start
+   release: npm run prisma:migrate:deploy
+   ```
 
-**Development (.env.development):**
-```bash
-NODE_ENV=development
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/mangal_superfoods
-S3_ENDPOINT=http://localhost:4566
-```
+2. **Deploy**:
+   ```bash
+   git push heroku main
+   ```
 
-**Staging (.env.staging):**
-```bash
-NODE_ENV=production
-DATABASE_URL=postgresql://user:pwd@staging-db.aws.com:5432/mangal_superfoods
-S3_ENDPOINT=https://s3.amazonaws.com
-WHAPI_TOKEN=staging_token_here
-```
+3. **Set environment variables**:
+   ```bash
+   heroku config:set PORT=4000 FRONTEND_ORIGIN="https://your-frontend.herokuapp.com" DATABASE_URL="..." ...
+   ```
 
-**Production (.env.production):**
-```bash
-NODE_ENV=production
-DATABASE_URL=postgresql://user:pwd@prod-db.aws.com:5432/mangal_superfoods
-S3_ENDPOINT=https://s3.amazonaws.com
-WHAPI_TOKEN=prod_token_here
-FRONTEND_ORIGIN=https://mangalsuperfoods.com
-```
+### Production Database Setup
+
+1. **Provision a PostgreSQL database** (AWS RDS, Google Cloud SQL, Heroku Postgres, etc.)
+2. **Update `DATABASE_URL`** with your production connection string (ensure SSL is enabled):
+   ```
+   postgresql://user:password@prod-db-host.com:5432/mangal_superfoods?sslmode=require
+   ```
+3. **Apply migrations**:
+   ```bash
+   npm run prisma:migrate:deploy
+   ```
+
+### Production S3 Setup
+
+1. **Create an S3 bucket** in your chosen provider
+2. **Set environment variables**:
+   ```bash
+   BUCKET_NAME="mangal-superfoods"
+   S3_ENDPOINT="https://s3.us-west-004.backblazeb2.com"  # or your provider's endpoint
+   AWS_REGION="us-east-1"
+   AWS_ACCESS_KEY_ID="your-production-key-id"
+   AWS_ACCESS_KEY="your-production-secret-key"
+   ```
+
+### Monitoring and Logging
+
+- **Application logs**: Check stdout/stderr or your logging service (CloudWatch, Datadog, etc.)
+- **Database logs**: Monitor slow queries and connection issues via your database provider
+- **S3 access logs**: Enable S3 access logging to track image uploads
+- **Health check endpoint** (optional): Add a `/health` endpoint to monitor API availability
 
 ---
 
-## Monitoring & Logging
+## Verification and Testing
 
-### PM2 Process Manager (Recommended for Production)
+### Local Development
 
+1. **Start the development server**:
+   ```bash
+   npm run dev
+   ```
+
+   Expected output:
+   ```
+   Listening on http://localhost:4000
+   ```
+
+2. **Test a basic endpoint**:
+   ```bash
+   curl http://localhost:4000/api/products
+   ```
+
+3. **Check database connection**:
+   ```bash
+   npm run prisma:studio
+   # Opens at http://localhost:5555
+   ```
+
+### Testing Key Features
+
+#### Users API
 ```bash
-# Install PM2 globally
-npm install -g pm2
+# Create a user
+curl -X POST http://localhost:4000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"id":"user123","mobile":"9876543210","password":"test123","role":"CUSTOMER"}'
 
-# Start app with PM2
-pm2 start npm --name "mangal-api" -- start
-
-# View logs
-pm2 logs mangal-api
-
-# Monitor
-pm2 monit
-
-# Enable auto-start on system reboot
-pm2 startup
-pm2 save
+# Get user
+curl http://localhost:4000/api/users/user123
 ```
 
-### Application Logging
-
-Logs are output to console:
-
+#### Products API
 ```bash
-# Development (with debug info)
-npm run dev
+# Get all products
+curl http://localhost:4000/api/products
 
-# Production (with PM2)
-pm2 logs mangal-api
-
-# Redirect to file
-npm start > app.log 2>&1 &
+# Create a product (with image upload)
+curl -X POST http://localhost:4000/api/products \
+  -F "name=Test Product" \
+  -F "price=100" \
+  -F "description=A test product" \
+  -F "images=@path/to/image.jpg"
 ```
 
-### Health Monitoring
-
+#### Orders API
 ```bash
-# Basic health check
-curl http://localhost:4000/health
+# Create an order
+curl -X POST http://localhost:4000/api/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId":"user123",
+    "items":[{"productId":"prod1","quantity":2}],
+    "shippingAddress":{"..."}: "..."}
+  }'
 
-# Uptime monitoring with cron
-*/5 * * * * curl -s http://localhost:4000/health || alert
+# Get orders for a user
+curl "http://localhost:4000/api/orders?userId=user123"
 ```
 
-### Database Monitoring
-
+#### SMS/OTP API
 ```bash
-# Check Prisma Studio (development)
-npm run prisma:studio
+# Send OTP
+curl -X POST http://localhost:4000/api/sms/send \
+  -H "Content-Type: application/json" \
+  -d '{"mobile":"9876543210"}'
 
-# Query count and performance
-psql -h localhost -U postgres -d mangal_superfoods
-SELECT * FROM pg_stat_statements;
+# Verify OTP
+curl -X POST http://localhost:4000/api/sms/verify \
+  -H "Content-Type: application/json" \
+  -d '{"mobile":"9876543210","code":"1234"}'
 ```
+
+### Production Verification
+
+1. **Test endpoints from your frontend domain** (to verify CORS)
+2. **Monitor error rates** in your logging service
+3. **Check S3 connectivity** by uploading a product image
+4. **Verify database backups** are being created
+5. **Load test** with realistic user volume
 
 ---
 
 ## Troubleshooting
 
-### Port Already in Use
+### Common Issues
 
+#### Database Connection Error
+
+**Error**: `error: connect ECONNREFUSED 127.0.0.1:6432`
+
+**Solution**:
+1. Verify Docker containers are running: `docker-compose ps`
+2. Check `DATABASE_URL` in `.env` matches the compose config
+3. Restart Docker services: `docker-compose restart postgres`
+4. Verify Docker volume wasn't corrupted: `docker-compose down -v && docker-compose up -d`
+
+#### Prisma Migration Failure
+
+**Error**: `X migration steps execution failed`
+
+**Solution**:
+1. Check that no other process is using the database
+2. Verify database user has sufficient permissions
+3. Try rolling back: `npx prisma migrate resolve --rolled-back <migration-name>`
+4. Check Prisma logs: `npx prisma migrate status`
+
+#### S3 Upload Failures
+
+**Error**: `NoSuchBucket` or `AccessDenied` from S3
+
+**Solution**:
+1. Verify S3 credentials in `.env`
+2. Check bucket exists: `aws s3 ls --profile your-profile` (or `docker exec ms_localstack awslocal s3 ls` for LocalStack)
+3. Verify bucket name matches `BUCKET_NAME` env var
+4. Check S3 IAM permissions (for AWS)
+5. Verify CORS is configured (for production)
+
+#### LocalStack Not Running
+
+**Error**: `connect ECONNREFUSED 127.0.0.1:4566`
+
+**Solution**:
+1. Start LocalStack: `docker-compose up -d localstack`
+2. Wait 10 seconds for it to fully initialize
+3. Check logs: `docker-compose logs localstack`
+4. Reset: `docker-compose down -v && docker-compose up -d`
+
+#### CORS Errors in Frontend
+
+**Error**: `Access to XMLHttpRequest blocked by CORS policy`
+
+**Solution**:
+1. Check `FRONTEND_ORIGIN` in `.env` includes your frontend URL
+2. Ensure no trailing slash: `http://localhost:3000`, not `http://localhost:3000/`
+3. For multiple origins, use comma-separated list: `http://localhost:3000,https://example.com`
+4. Restart the backend server for changes to take effect
+
+#### Port Already in Use
+
+**Error**: `listen EADDRINUSE :::4000`
+
+**Solution**:
+1. Find process using port: `lsof -i :4000` (macOS/Linux) or `netstat -ano | findstr :4000` (Windows)
+2. Kill the process: `kill -9 <PID>`
+3. Or change `PORT` in `.env` to an available port
+
+#### WhatsApp OTP Not Sending
+
+**Error**: `API request to whapi.cloud failed`
+
+**Solution**:
+1. Verify `WHAPI_TOKEN` is correct
+2. Check that your business number is verified in whapi.cloud
+3. Verify monthly quota hasn't been exceeded
+4. Check whapi.cloud status page
+
+### Database Inspection
+
+#### Using Prisma Studio
 ```bash
-# Find process using port 4000
-lsof -i :4000
-
-# Kill process
-kill -9 <PID>
-
-# Or change port
-PORT=5000 npm start
+npm run prisma:studio
+# Opens UI at http://localhost:5555
 ```
 
-### Database Connection Failed
-
+#### Using psql (PostgreSQL CLI)
 ```bash
-# Check PostgreSQL is running
-docker-compose ps
-
-# Test connection
-psql postgresql://postgres:postgres@localhost:5432/mangal_superfoods
-
-# Check DATABASE_URL in .env
-echo $DATABASE_URL
+psql postgresql://ravi:ravi@2026@localhost:6432/mangal_superfoods_store
+# Connect to the database and run SQL queries
 ```
 
-### S3 Upload Fails
+### Viewing Logs
 
+#### Development
 ```bash
-# Check LocalStack is running
-curl http://localhost:4566
-
-# Check bucket exists
-aws s3 ls --endpoint-url http://localhost:4566
-
-# Re-initialize S3
-npm run init:s3
+npm run dev
+# Logs appear in the terminal
 ```
 
-### Prisma Client Out of Sync
-
+#### Docker Containers
 ```bash
-# Regenerate Prisma client
-npm run prisma:generate
+docker-compose logs -f postgres
+docker-compose logs -f localstack
+```
 
-# Or reinstall dependencies
-rm -rf node_modules package-lock.json
-npm install
+#### PM2 (if using process manager)
+```bash
+pm2 logs mangal-api
+pm2 logs mangal-api --err
 ```
 
 ---
 
-## Backup & Recovery
+## Next Steps
 
-### Database Backup
+- **Frontend Integration**: Ensure the frontend calls the correct API endpoints (see `docs/API_REFERENCE.md`)
+- **Monitoring**: Set up error tracking (Sentry, DataDog, etc.) and performance monitoring
+- **Backup Strategy**: Configure automated database backups
+- **CI/CD**: Set up GitHub Actions or similar for automated testing and deployment
+- **Security**: Enable database SSL, API authentication/authorization if needed
 
-```bash
-# Backup PostgreSQL
-pg_dump postgresql://postgres:postgres@localhost/mangal_superfoods > backup.sql
-
-# Restore from backup
-psql postgresql://postgres:postgres@localhost/mangal_superfoods < backup.sql
-```
-
-### S3 Backup
-
-```bash
-# Sync S3 to local
-aws s3 sync s3://mangal-superfoods ./s3-backup --endpoint-url http://localhost:4566
-
-# Sync local to S3
-aws s3 sync ./uploads s3://mangal-superfoods --endpoint-url http://localhost:4566
-```
-
----
-
-## Performance Optimization
-
-### Database Query Optimization
-
-```bash
-# Enable query logging in Prisma
-DATABASE_DEBUG=* npm run dev
-
-# Analyze slow queries in Postgres
-EXPLAIN ANALYZE SELECT * FROM "Product" WHERE category = 'Dry Fruits';
-```
-
-### Connection Pooling
-
-Production connection string should use connection pooling:
-
-```
-postgresql://user:password@localhost:5432/mangal_superfoods?schema=public&pool_size=10&max_overflow=20
-```
-
-### API Rate Limiting
-
-Consider adding rate limiting middleware:
-
-```bash
-npm install express-rate-limit
-```
-
----
-
-## Checklist for Production
-
-- [ ] Update FRONTEND_ORIGIN to production domain
-- [ ] Set NODE_ENV=production
-- [ ] Use production database (AWS RDS, etc.)
-- [ ] Use production S3 bucket
-- [ ] Set WHAPI_TOKEN for SMS
-- [ ] Enable HTTPS/SSL
-- [ ] Set up error logging (Sentry, etc.)
-- [ ] Configure automatic backups
-- [ ] Set up monitoring alerts
-- [ ] Run database migrations
-- [ ] Test all endpoints
-- [ ] Load test API
-- [ ] Document deployment procedures
+For detailed API documentation, see [API_REFERENCE.md](API_REFERENCE.md).
 
 ---
 

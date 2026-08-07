@@ -2,6 +2,7 @@ import 'dotenv/config';
 import pkg from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
+import { scryptSync, randomBytes } from 'crypto';
 
 const { PrismaClient } = pkg;
 
@@ -45,6 +46,13 @@ function toImageStrings(images, fallbackPrefix) {
   // `assets/assets.js` imports images as modules; in DB we store strings.
   if (!Array.isArray(images)) return [];
   return images.map((_, idx) => `${fallbackPrefix}_${idx + 1}`);
+}
+
+function hashPassword(password) {
+  // Hash password using same method as auth.js: salt:key format
+  const salt = randomBytes(16).toString('hex');
+  const key = scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${key}`;
 }
 
 async function main() {
@@ -540,10 +548,34 @@ async function main() {
 
   // --- Upserts ---
   for (const u of users) {
+    const hashedPassword = u.password ? hashPassword(u.password) : null;
     await prisma.user.upsert({
       where: { id: u.id },
-      update: { name: u.name, email: u.email, image: u.image, cart: u.cart },
-      create: { id: u.id, name: u.name, email: u.email, image: u.image, cart: u.cart },
+      update: {
+        name: u.name,
+        email: u.email,
+        image: u.image,
+        cart: u.cart,
+        mobile: u.mobile,
+        password: hashedPassword,
+        role: u.role,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        verifiedEmail: u.verifiedEmail,
+      },
+      create: {
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        image: u.image,
+        cart: u.cart,
+        mobile: u.mobile,
+        password: hashedPassword,
+        role: u.role,
+        firstName: u.firstName,
+        lastName: u.lastName,
+        verifiedEmail: u.verifiedEmail,
+      },
     });
   }
 
@@ -656,6 +688,68 @@ async function main() {
         body: template.body,
       },
       create: template,
+    });
+  }
+
+  // Create ratings with associated orders
+  const ratingMaps = [
+    { productId: 'prod_1', userId: 'user_kristin_watson', rating: 4, review: 'Great product, very satisfied.' },
+    { productId: 'prod_2', userId: 'user_jenny_wilson', rating: 5, review: 'Perfect quality and fast delivery.' },
+    { productId: 'prod_3', userId: 'user_bessie_cooper', rating: 4, review: 'Good value for money.' },
+    { productId: 'prod_almond', userId: 'user_kristin_watson', rating: 5, review: 'Fresh and crunchy almonds!' },
+    { productId: 'prod_kaju', userId: 'user_jenny_wilson', rating: 5, review: 'Best cashews online.' },
+  ];
+
+  for (const ratingData of ratingMaps) {
+    // Create a unique order for each rating
+    const orderId = `order_rating_${ratingData.productId}_${ratingData.userId}`;
+
+    // First ensure order exists
+    await prisma.order.upsert({
+      where: { id: orderId },
+      update: {},
+      create: {
+        id: orderId,
+        total: 100,
+        status: 'DELIVERED',
+        userId: ratingData.userId,
+        addressId: 'addr_1',
+        isPaid: true,
+        paymentMethod: 'COD',
+        isCouponUsed: false,
+        coupon: {},
+        orderItems: {
+          create: [
+            {
+              productId: ratingData.productId,
+              quantity: 1,
+              price: 100,
+            },
+          ],
+        },
+      },
+    });
+
+    // Then create the rating
+    await prisma.rating.upsert({
+      where: {
+        userId_productId_orderId: {
+          userId: ratingData.userId,
+          productId: ratingData.productId,
+          orderId,
+        },
+      },
+      update: {
+        rating: ratingData.rating,
+        review: ratingData.review,
+      },
+      create: {
+        rating: ratingData.rating,
+        review: ratingData.review,
+        userId: ratingData.userId,
+        productId: ratingData.productId,
+        orderId,
+      },
     });
   }
 
