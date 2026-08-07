@@ -20,7 +20,8 @@ router.get('/', async (request, response) => {
       if (!user) {
         return response.status(404).json({ error: 'User not found' });
       }
-      return response.json(user);
+      const { password, ...safeUser } = user;
+      return response.json(safeUser);
     }
 
     const users = await prisma.user.findMany({
@@ -30,7 +31,10 @@ router.get('/', async (request, response) => {
         buyerOrders: true,
       },
     });
-    response.json(users);
+
+    // Strip passwords from all users
+    const safeUsers = users.map(({ password, ...safeUser }) => safeUser);
+    response.json(safeUsers);
   } catch (error) {
     console.error('Error fetching users:', error);
     response.status(500).json({ error: 'Failed to fetch users' });
@@ -43,6 +47,14 @@ router.post('/', async (request, response) => {
 
     if (!id || !name) {
       return response.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Check for duplicate mobile if provided
+    if (mobile) {
+      const existingUser = await prisma.user.findUnique({ where: { mobile } });
+      if (existingUser) {
+        return response.status(409).json({ error: 'Mobile number already registered' });
+      }
     }
 
     const hashedPassword = password ? hashPassword(password) : null;
@@ -60,9 +72,14 @@ router.post('/', async (request, response) => {
       },
     });
 
-    response.status(201).json(user);
+    // Strip password from response
+    const { password: _password, ...safeUser } = user;
+    response.status(201).json(safeUser);
   } catch (error) {
     console.error('Error creating user:', error);
+    if (error.code === 'P2002' && error.meta?.target?.includes('mobile')) {
+      return response.status(409).json({ error: 'Mobile number already registered' });
+    }
     response.status(500).json({ error: 'Failed to create user' });
   }
 });
@@ -84,9 +101,14 @@ router.put('/', async (request, response) => {
       data: updateData,
     });
 
-    response.status(200).json(user);
+    // Strip password from response
+    const { password, ...safeUser } = user;
+    response.status(200).json(safeUser);
   } catch (error) {
     console.error('Error updating user:', error);
+    if (error.code === 'P2025') {
+      return response.status(404).json({ error: 'User not found' });
+    }
     response.status(500).json({ error: 'Failed to update user' });
   }
 });

@@ -553,13 +553,13 @@ async function main() {
       update: {
         userId: a.userId,
         name: a.name,
-        email: a.email,
-        street: a.street,
+        mobile: a.mobile,
+        pincode: a.pincode,
+        addressLine1: a.addressLine1,
+        addressLine2: a.addressLine2,
+        landmark: a.landmark,
         city: a.city,
         state: a.state,
-        zip: a.zip,
-        country: a.country,
-        phone: a.phone,
       },
       create: a,
     });

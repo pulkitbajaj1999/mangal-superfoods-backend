@@ -6,8 +6,12 @@ const router = express.Router();
 
 router.get('/', async (request, response) => {
   try {
-    // For now, return all. In real app, filter by user
+    const { userId } = request.query;
+
+    const whereClause = userId ? { userId } : {};
+
     const addresses = await prisma.address.findMany({
+      where: whereClause,
       include: {
         user: true,
       },
@@ -23,8 +27,19 @@ router.post('/', async (request, response) => {
   try {
     const { userId, name, mobile, pincode, addressLine1, addressLine2, landmark, city, state } = request.body;
 
-    if (!userId || !name || !mobile || !pincode || !addressLine1 || !addressLine2 || !city || !state) {
+    // Validate required fields (addressLine2 is optional per schema)
+    if (!userId || !name || !mobile || !pincode || !addressLine1 || !city || !state) {
       return response.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Validate mobile format (10 digits)
+    if (!/^\d{10}$/.test(mobile)) {
+      return response.status(400).json({ error: 'Invalid mobile format (must be 10 digits)' });
+    }
+
+    // Validate pincode format (6 digits)
+    if (!/^\d{6}$/.test(pincode)) {
+      return response.status(400).json({ error: 'Invalid pincode format (must be 6 digits)' });
     }
 
     const address = await prisma.address.create({
@@ -34,7 +49,7 @@ router.post('/', async (request, response) => {
         mobile,
         pincode,
         addressLine1,
-        addressLine2,
+        addressLine2: addressLine2 || null,
         landmark: landmark || null,
         city,
         state,
@@ -44,6 +59,9 @@ router.post('/', async (request, response) => {
     response.status(201).json(address);
   } catch (error) {
     console.error('Error creating address:', error);
+    if (error.code === 'P2003') {
+      return response.status(404).json({ error: 'User not found' });
+    }
     response.status(500).json({ error: 'Failed to create address' });
   }
 });

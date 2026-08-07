@@ -73,8 +73,17 @@ router.post('/verify', async (request, response) => {
   try {
     const { mobile, otp } = request.body;
 
-    if (!mobile || !/^\d{10}$/.test(mobile) || !otp || !/^\d{4}$/.test(otp)) {
-      return response.status(400).json({ error: 'Invalid input' });
+    // Validate input
+    if (!mobile || !otp) {
+      return response.status(400).json({ success: false, error: 'Mobile and OTP are required' });
+    }
+
+    if (!/^\d{10}$/.test(mobile)) {
+      return response.status(400).json({ success: false, error: 'Invalid mobile format (must be 10 digits)' });
+    }
+
+    if (!/^\d{4}$/.test(otp)) {
+      return response.status(400).json({ success: false, error: 'Invalid OTP format (must be 4 digits)' });
     }
 
     const existingOtp = await prisma.otpCode.findFirst({
@@ -101,7 +110,7 @@ router.post('/verify', async (request, response) => {
     response.status(200).json({ success: true, message: 'OTP verified' });
   } catch (error) {
     console.error('OTP verify error', error);
-    response.status(500).json({ error: 'Internal server error' });
+    response.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
 
