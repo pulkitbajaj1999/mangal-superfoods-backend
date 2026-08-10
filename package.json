@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch server.js",
-    "start": "node server.js",
+    "dev": "bun --watch server.js",
+    "dev:debug": "bun --inspect=localhost:6499/mangal --watch server.js",
+    "start": "bun server.js",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
@@ -13,7 +14,7 @@
     "prisma:db:push": "prisma db push",
     "prisma:db:pull": "prisma db pull",
     "prisma:format": "prisma format",
-    "db:seed": "node prisma/seed.mjs",
+    "db:seed": "bun prisma/seed.mjs",
     "postinstall": "prisma generate",
     "init:s3": "chmod +x init-s3.sh && ./init-s3.sh"
   },

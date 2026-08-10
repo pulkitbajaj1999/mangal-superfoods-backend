@@ -1,0 +1,1501 @@
+{
+  "info": {
+    "_postman_id": "mangal-superfoods-api",
+    "name": "Mangal Superfoods API",
+    "description": "Complete API collection for the Mangal Superfoods backend (Express + Prisma/Postgres).\n\n**Base URL:** `{{base_url}}` — defaults to `http://localhost:4000`. All resource routes are mounted under `/api`; `/health` is not.\n\n**Authentication:** none. There is no session/token middleware — every route is unprotected at the HTTP layer. Role checks (ADMIN/SELLER) are enforced client-side in the frontend only, so \"admin only\" notes below are conventions, not enforcement.\n\n**Sample data:** the variable defaults match `prisma/seed.mjs`. Run `npm run db:seed` first, and `npm run init:s3` before touching product image endpoints.\n\n**Docs:** `docs/API_REFERENCE.md`, `docs/DATABASE_SCHEMA.md`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Status is ok', function () {",
+                  "    pm.expect(pm.response.json().status).to.equal('ok');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Liveness probe. Note this is NOT under `/api`."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"status\": \"ok\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login with Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success and user', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.success).to.equal(true);",
+                  "    pm.expect(jsonData.user).to.have.property('id');",
+                  "});",
+                  "",
+                  "pm.test('Password is not leaked', function () {",
+                  "    pm.expect(pm.response.json().user).to.not.have.property('password');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.collectionVariables.set('user_id', pm.response.json().user.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Authenticate with mobile + password. Passwords are stored as scrypt `salt:key`.\n\n**Validation:** `mobile` must be exactly 10 digits; `password` non-empty.\n\n**Errors:** `400` invalid mobile/password format · `404` user not found · `401` invalid credentials · `500` internal error.\n\nSaves the returned user id into the `user_id` collection variable."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\",\n  \"password\": \"password123\"\n}" },
+                "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"user\": {\n    \"id\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n    \"name\": \"GreatStack\",\n    \"email\": \"greatstack@example.com\",\n    \"image\": \"http://localhost:4566/mangal-superfoods/gs_logo.jpg\",\n    \"cart\": {},\n    \"role\": \"CUSTOMER\",\n    \"mobile\": \"1234567890\",\n    \"firstName\": \"Great\",\n    \"lastName\": \"Stack\",\n    \"inactive\": false,\n    \"verifiedEmail\": true,\n    \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n    \"updatedAt\": \"2026-01-15T10:30:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "Invalid Credentials",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\",\n  \"password\": \"wrong\"\n}" },
+                "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Invalid credentials\"\n}"
+            },
+            {
+              "name": "User Not Found",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"9999999999\",\n  \"password\": \"password123\"\n}" },
+                "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"User not found\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Passwords are stripped', function () {",
+                  "    pm.response.json().forEach(function (u) {",
+                  "        pm.expect(u).to.not.have.property('password');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Fetch all users, each including `ratings`, `Address` and `buyerOrders`. Passwords are stripped from every row.\n\nReturns an **array**. Contrast with the `?mobile=` variant, which returns a single object."
+          },
+          "response": []
+        },
+        {
+          "name": "Get User by Mobile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 404', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Response has user data', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('id');",
+                  "        pm.expect(jsonData).to.have.property('mobile');",
+                  "        pm.expect(jsonData).to.have.property('role');",
+                  "        pm.expect(jsonData).to.not.have.property('password');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/users?mobile={{mobile}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"],
+              "query": [
+                { "key": "mobile", "value": "{{mobile}}", "description": "Exact 10-digit mobile to look up" }
+              ]
+            },
+            "description": "Look up a single user by mobile number (used during login/signup to decide sign-in vs sign-up).\n\nReturns a **single object**, not an array. `404` if no user has that mobile."
+          },
+          "response": [
+            {
+              "name": "User Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/users?mobile=1234567890",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "users"],
+                  "query": [{ "key": "mobile", "value": "1234567890" }]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n  \"name\": \"GreatStack\",\n  \"email\": \"greatstack@example.com\",\n  \"image\": \"http://localhost:4566/mangal-superfoods/gs_logo.jpg\",\n  \"cart\": {},\n  \"role\": \"CUSTOMER\",\n  \"mobile\": \"1234567890\",\n  \"firstName\": \"Great\",\n  \"lastName\": \"Stack\",\n  \"inactive\": false,\n  \"verifiedEmail\": true,\n  \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n  \"updatedAt\": \"2026-01-15T10:30:00.000Z\"\n}"
+            },
+            {
+              "name": "User Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/users?mobile=9988888888",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "users"],
+                  "query": [{ "key": "mobile", "value": "9988888888" }]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"User not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create User (Sign Up)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// User.id is caller-supplied (not cuid-generated) and mobile is unique,",
+                  "// so generate fresh values to keep this request re-runnable.",
+                  "var stamp = Date.now().toString();",
+                  "pm.collectionVariables.set('new_user_id', 'user_pm_' + stamp);",
+                  "pm.collectionVariables.set('new_user_mobile', '9' + stamp.slice(-9));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has user id and default role', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.role).to.equal('CUSTOMER');",
+                  "});",
+                  "",
+                  "pm.test('Password is not returned', function () {",
+                  "    pm.expect(pm.response.json()).to.not.have.property('password');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{new_user_id}}\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"image\": \"\",\n  \"mobile\": \"{{new_user_mobile}}\",\n  \"password\": \"password123\",\n  \"cart\": {},\n  \"role\": \"CUSTOMER\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Register a new user.\n\n**`id` is REQUIRED and caller-supplied** — unlike every other model, `User.id` is not cuid-generated. Omitting it returns `400 Missing required fields`. The pre-request script generates a unique `id` and `mobile` so the request stays re-runnable.\n\n**Required:** `id`, `name`.\n**Optional:** `email`, `image`, `mobile` (10 digits, unique), `password` (hashed with scrypt), `cart` (JSON, defaults `{}`), `role` (`CUSTOMER` | `ADMIN` | `SELLER`, defaults `CUSTOMER`).\n\n**Errors:** `400` missing `id`/`name` · `409` mobile already registered · `500` failed to create."
+          },
+          "response": [
+            {
+              "name": "Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"id\": \"user_pm_1\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"mobile\": \"9988776655\",\n  \"password\": \"password123\"\n}" },
+                "url": { "raw": "{{base_url}}/api/users", "host": ["{{base_url}}"], "path": ["api", "users"] }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"user_pm_1\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"image\": \"\",\n  \"cart\": {},\n  \"role\": \"CUSTOMER\",\n  \"mobile\": \"9988776655\",\n  \"inactive\": false,\n  \"verifiedEmail\": false,\n  \"createdAt\": \"2026-08-08T10:30:00.000Z\",\n  \"updatedAt\": \"2026-08-08T10:30:00.000Z\"\n}"
+            },
+            {
+              "name": "Missing Required Fields",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"name\": \"John Doe\"\n}" },
+                "url": { "raw": "{{base_url}}/api/users", "host": ["{{base_url}}"], "path": ["api", "users"] }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Missing required fields\"\n}"
+            },
+            {
+              "name": "Mobile Already Registered",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"id\": \"user_pm_2\",\n  \"name\": \"John Doe\",\n  \"mobile\": \"1234567890\"\n}" },
+                "url": { "raw": "{{base_url}}/api/users", "host": ["{{base_url}}"], "path": ["api", "users"] }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Mobile number already registered\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update User Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Password is not returned', function () {",
+                  "    pm.expect(pm.response.json()).to.not.have.property('password');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{user_id}}\",\n  \"name\": \"Great Stack Updated\",\n  \"email\": \"greatstack.updated@example.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/users",
+              "host": ["{{base_url}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Update a user's `name` and/or `email`. The target user is identified by `id` **in the body** — there is no `/api/users/:id` route.\n\nOnly `name` and `email` are updatable here; `mobile`, `role`, `cart` and `password` are ignored.\n\n**Errors:** `400` missing `id` · `404` user not found · `500` failed to update."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "Get All Products",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "",
+                  "var products = pm.response.json();",
+                  "if (Array.isArray(products) && products.length > 0) {",
+                  "    pm.collectionVariables.set('product_id', products[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            },
+            "description": "Fetch the full catalog. Each product includes its `rating` and `orderItems` relations.\n\nNo pagination, filtering or sorting is implemented — the frontend filters client-side."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "{{base_url}}/api/products", "host": ["{{base_url}}"], "path": ["api", "products"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"id\": \"prod_almond\",\n    \"name\": \"Almond\",\n    \"description\": \"Premium California almonds packed with rich nutrients and a naturally crunchy taste...\",\n    \"mrp\": 520,\n    \"price\": 449,\n    \"images\": [\n      \"http://localhost:4566/mangal-superfoods/superfoods/almond.jpg\"\n    ],\n    \"category\": \"Dry Fruits\",\n    \"inStock\": true,\n    \"createdAt\": \"2026-01-10T08:00:00.000Z\",\n    \"updatedAt\": \"2026-01-15T10:30:00.000Z\",\n    \"rating\": [],\n    \"orderItems\": []\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Get Product by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 404', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Has product fields', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('id');",
+                  "        pm.expect(jsonData).to.have.property('price');",
+                  "        pm.expect(jsonData.images).to.be.an('array');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}"]
+            },
+            "description": "Fetch one product with `rating` and `orderItems` included.\n\n**Errors:** `404` product not found · `500` failed to fetch."
+          },
+          "response": [
+            {
+              "name": "Not Found",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "{{base_url}}/api/products/does_not_exist", "host": ["{{base_url}}"], "path": ["api", "products", "does_not_exist"] }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Product not found\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has product id and images', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('name');",
+                  "    pm.expect(jsonData.images).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('product_id', pm.response.json().id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "New Product", "type": "text", "description": "Required" },
+                { "key": "description", "value": "Product description here", "type": "text", "description": "Required" },
+                { "key": "mrp", "value": "500", "type": "text", "description": "Required, numeric" },
+                { "key": "price", "value": "450", "type": "text", "description": "Required, numeric" },
+                { "key": "category", "value": "Dry Fruits", "type": "text", "description": "Required" },
+                { "key": "inStock", "value": "true", "type": "text", "description": "Optional. Only the exact string \"false\" turns it off; anything else is true." },
+                { "key": "images", "type": "file", "src": [], "description": "Required — at least one file. Attach one or more images before sending." }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products"]
+            },
+            "description": "Create a product. **`multipart/form-data` only** — do not set a `Content-Type` header manually, Postman sets the boundary.\n\nFiles are uploaded to S3 first, then the resulting URLs (`{S3_ENDPOINT}/{BUCKET_NAME}/{timestamp}-{originalname}`) are stored on the `images` array. Run `npm run init:s3` so the bucket exists locally.\n\n**Required:** `name`, `description`, `mrp`, `price`, `category`, and at least one `images` file.\n\n**Errors:** `400` missing fields · `400` no images · `500` S3 upload failed · `500` failed to create.\n\n> ⚠️ **Attach a file to `images` before sending** — with an empty file field the request returns `400 At least one image is required`."
+          },
+          "response": [
+            {
+              "name": "No Images",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": { "mode": "formdata", "formdata": [{ "key": "name", "value": "New Product", "type": "text" }] },
+                "url": { "raw": "{{base_url}}/api/products", "host": ["{{base_url}}"], "path": ["api", "products"] }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"At least one image is required\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Product (Full Edit)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "name", "value": "Updated Product Name", "type": "text", "description": "Optional" },
+                { "key": "description", "value": "Updated description", "type": "text", "description": "Optional" },
+                { "key": "mrp", "value": "600", "type": "text", "description": "Optional, numeric" },
+                { "key": "price", "value": "550", "type": "text", "description": "Optional, numeric" },
+                { "key": "category", "value": "Dry Fruits", "type": "text", "description": "Optional" },
+                { "key": "inStock", "value": "true", "type": "text", "description": "Optional. Only the exact string \"true\" sets it true; anything else sets it false." },
+                { "key": "existingImages", "value": "[\"http://localhost:4566/mangal-superfoods/superfoods/almond.jpg\"]", "type": "text", "description": "JSON array string of image URLs to KEEP. Omitting this wipes all existing images." },
+                { "key": "images", "type": "file", "src": [], "description": "Optional — new files to append after existingImages" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}"]
+            },
+            "description": "Update a product. Every field is optional; only the ones you send are applied.\n\nThe final `images` array is `existingImages` (URLs you want to keep) **concatenated with** the newly uploaded files.\n\n> ⚠️ **`existingImages` is destructive when omitted.** It defaults to `[]`, and the resulting empty array is still written to the row — so any PUT that leaves it out clears every image on the product. Always send the current image URLs you want to retain.\n\n> ⚠️ **`inStock` is compared against the string `\"true\"`.** Send `\"true\"` / `\"false\"` as text. A JSON boolean `true` does **not** match and is stored as `false`.\n\n**Errors:** `500` failed to update (including for a non-existent id — this route does not return `404`)."
+          },
+          "response": []
+        },
+        {
+          "name": "Toggle Product Stock",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('inStock is false', function () {",
+                  "    pm.expect(pm.response.json().inStock).to.equal(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "inStock", "value": "false", "type": "text", "description": "Exact string \"true\" or \"false\"" },
+                { "key": "existingImages", "value": "[\"http://localhost:4566/mangal-superfoods/superfoods/almond.jpg\"]", "type": "text", "description": "REQUIRED here — omit it and the product's images are erased" }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}"]
+            },
+            "description": "Flip a product's in-stock flag. Same `PUT /api/products/:id` handler as the full edit — there is no dedicated stock endpoint.\n\nSent as form-data rather than JSON on purpose:\n\n1. `inStock` is evaluated as `inStock === 'true'`, so it must be the **string** `\"true\"` or `\"false\"`. A JSON boolean `true` is stored as `false`.\n2. `existingImages` must carry the product's current image URLs, otherwise the update writes an empty `images` array.\n\nFetch the product first (Get Product by ID) and paste its `images` into `existingImages` before sending."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200, 404 or 409', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404, 409]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/products/{{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "products", "{{product_id}}"]
+            },
+            "description": "Delete a product. Refused if the product appears in any `orderItems`.\n\n**Success (200):** `{ \"success\": true }`\n\n**Errors:** `404` product not found · `409` cannot delete product with existing orders · `500` failed to delete."
+          },
+          "response": [
+            {
+              "name": "Deleted",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": { "raw": "{{base_url}}/api/products/prod_1", "host": ["{{base_url}}"], "path": ["api", "products", "prod_1"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true\n}"
+            },
+            {
+              "name": "Has Existing Orders",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": { "raw": "{{base_url}}/api/products/prod_almond", "host": ["{{base_url}}"], "path": ["api", "products", "prod_almond"] }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Cannot delete product with existing orders\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Orders",
+      "item": [
+        {
+          "name": "Get All Orders",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});",
+                  "",
+                  "var orders = pm.response.json();",
+                  "if (Array.isArray(orders) && orders.length > 0) {",
+                  "    pm.collectionVariables.set('order_id', orders[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders"]
+            },
+            "description": "Fetch all orders (admin dashboard view), including `user`, `address`, and `orderItems` with their nested `product`."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Orders by User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('All orders belong to the requested user', function () {",
+                  "    var userId = pm.collectionVariables.get('user_id');",
+                  "    pm.response.json().forEach(function (o) {",
+                  "        pm.expect(o.userId).to.equal(userId);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/orders?userId={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "userId", "value": "{{user_id}}", "description": "Filter orders by customer ID" }
+              ]
+            },
+            "description": "Fetch a single customer's order history. An unknown `userId` returns `[]`, not a `404`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has order id and default status', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData.status).to.equal('ORDER_PLACED');",
+                  "});",
+                  "",
+                  "pm.test('Order items were created', function () {",
+                  "    pm.expect(pm.response.json().orderItems).to.be.an('array').that.is.not.empty;",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('order_id', pm.response.json().id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"addressId\": \"{{address_id}}\",\n  \"total\": 672.3,\n  \"paymentMethod\": \"COD\",\n  \"isCouponUsed\": true,\n  \"coupon\": {\n    \"code\": \"OFF10\",\n    \"description\": \"10% Off for All Users\",\n    \"discount\": 10\n  },\n  \"orderItems\": [\n    {\n      \"productId\": \"prod_almond\",\n      \"quantity\": 1,\n      \"price\": 449\n    },\n    {\n      \"productId\": \"prod_alsi\",\n      \"quantity\": 2,\n      \"price\": 149\n    }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders"]
+            },
+            "description": "Create an order and its `OrderItem` rows in a single nested Prisma create.\n\n**Required:** `total` (non-zero number), `userId`, `addressId`, `paymentMethod` (`COD` | `STRIPE`), and a non-empty `orderItems` array of `{ productId, quantity, price }`.\n**Optional:** `isCouponUsed` (defaults `false`), `coupon` (free-form JSON snapshot, defaults `{}`).\n\n`status` always starts at `ORDER_PLACED` and `isPaid` at `false` — neither can be set at creation.\n\n**Errors:** `400` missing required fields · `500` failed to create (this is also what you get for a bad `userId`/`addressId`/`productId`, since the FK violation is not mapped to a `404`).\n\n> Note: `total` is checked with `!total`, so a `total` of `0` is rejected as a missing field."
+          },
+          "response": [
+            {
+              "name": "Created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"userId\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n  \"addressId\": \"addr_1\",\n  \"total\": 672.3,\n  \"paymentMethod\": \"COD\",\n  \"orderItems\": [{ \"productId\": \"prod_almond\", \"quantity\": 1, \"price\": 449 }]\n}" },
+                "url": { "raw": "{{base_url}}/api/orders", "host": ["{{base_url}}"], "path": ["api", "orders"] }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"id\": \"cm9generatedcuid0000000000\",\n  \"total\": 672.3,\n  \"status\": \"ORDER_PLACED\",\n  \"userId\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n  \"addressId\": \"addr_1\",\n  \"isPaid\": false,\n  \"paymentMethod\": \"COD\",\n  \"isCouponUsed\": false,\n  \"coupon\": {},\n  \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n  \"updatedAt\": \"2026-01-15T10:30:00.000Z\",\n  \"orderItems\": [\n    {\n      \"orderId\": \"cm9generatedcuid0000000000\",\n      \"productId\": \"prod_almond\",\n      \"quantity\": 1,\n      \"price\": 449,\n      \"product\": {}\n    }\n  ]\n}"
+            },
+            {
+              "name": "Missing Required Fields",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"userId\": \"user_1\"\n}" },
+                "url": { "raw": "{{base_url}}/api/orders", "host": ["{{base_url}}"], "path": ["api", "orders"] }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Missing required fields\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Order Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Status was updated', function () {",
+                  "    pm.expect(pm.response.json().status).to.equal('SHIPPED');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SHIPPED\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/orders/{{order_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "orders", "{{order_id}}"]
+            },
+            "description": "Transition an order's status. This route updates **only** `status` — no other field is writable.\n\n**Allowed values:** `ORDER_PLACED` → `PROCESSING` → `SHIPPED` → `DELIVERED`. Any other value is rejected; note the handler does not enforce ordering, so it will accept a backwards transition.\n\n**Errors:** `400` status required · `400` invalid status · `500` failed to update (also returned for an unknown order id)."
+          },
+          "response": [
+            {
+              "name": "Invalid Status",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"status\": \"CANCELLED\"\n}" },
+                "url": { "raw": "{{base_url}}/api/orders/order_1", "host": ["{{base_url}}"], "path": ["api", "orders", "order_1"] }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Invalid status\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Addresses",
+      "item": [
+        {
+          "name": "Get All Addresses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/addresses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "addresses"]
+            },
+            "description": "Fetch every address in the system, each with its `user` relation included.\n\nThere is no auth layer, so this is not scoped to a caller — use the `?userId=` variant for a single customer's address book."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Addresses by User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var addresses = pm.response.json();",
+                  "if (Array.isArray(addresses) && addresses.length > 0) {",
+                  "    pm.collectionVariables.set('address_id', addresses[0].id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/addresses?userId={{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "addresses"],
+              "query": [
+                { "key": "userId", "value": "{{user_id}}", "description": "Filter addresses by owner" }
+              ]
+            },
+            "description": "Fetch the saved addresses for one user. Saves the first result into the `address_id` collection variable for use by Create Order."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Address",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has address id', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('addressLine1');",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.collectionVariables.set('address_id', pm.response.json().id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"name\": \"Aditi Sharma\",\n  \"mobile\": \"9999999999\",\n  \"pincode\": \"400001\",\n  \"addressLine1\": \"Flat 302, Sunrise Apartments\",\n  \"addressLine2\": \"Near Marine Lines Station\",\n  \"landmark\": \"Opposite City Hospital\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/addresses",
+              "host": ["{{base_url}}"],
+              "path": ["api", "addresses"]
+            },
+            "description": "Save a new delivery address.\n\n**Required:** `userId`, `name`, `mobile` (exactly 10 digits), `pincode` (exactly 6 digits), `addressLine1`, `city`, `state`.\n**Optional:** `addressLine2`, `landmark` (both stored as `null` when omitted).\n\n**Errors:** `400` missing required fields · `400` invalid mobile format · `400` invalid pincode format · `404` user not found (FK violation) · `500` failed to create."
+          },
+          "response": [
+            {
+              "name": "Invalid Pincode",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"userId\": \"user_1\",\n  \"name\": \"Aditi\",\n  \"mobile\": \"9999999999\",\n  \"pincode\": \"4000\",\n  \"addressLine1\": \"Flat 302\",\n  \"city\": \"Mumbai\",\n  \"state\": \"Maharashtra\"\n}" },
+                "url": { "raw": "{{base_url}}/api/addresses", "host": ["{{base_url}}"], "path": ["api", "addresses"] }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Invalid pincode format (must be 6 digits)\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ratings",
+      "item": [
+        {
+          "name": "Get All Ratings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', function () {",
+                  "    pm.expect(pm.response.json()).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ratings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ratings"]
+            },
+            "description": "Fetch all ratings across all products, each with the full `user` and `product` relations included."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Ratings by Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('All ratings match the product filter', function () {",
+                  "    var productId = pm.collectionVariables.get('product_id');",
+                  "    pm.response.json().forEach(function (r) {",
+                  "        pm.expect(r.productId).to.equal(productId);",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/ratings?productId={{product_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ratings"],
+              "query": [
+                { "key": "productId", "value": "{{product_id}}", "description": "Filter ratings by product ID" }
+              ]
+            },
+            "description": "Fetch the review list for one product. An unknown `productId` returns `[]`, not a `404`."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Rating",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201 or 409', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([201, 409]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 201) {",
+                  "    pm.test('Response has rating id', function () {",
+                  "        var jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('id');",
+                  "        pm.expect(jsonData).to.have.property('rating');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"review\": \"Excellent quality almonds, very fresh and crunchy!\",\n  \"userId\": \"{{user_id}}\",\n  \"productId\": \"prod_almond\",\n  \"orderId\": \"{{order_id}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/ratings",
+              "host": ["{{base_url}}"],
+              "path": ["api", "ratings"]
+            },
+            "description": "Submit a review for a product the user actually ordered.\n\n**Required:** `rating`, `userId`, `productId`, **`orderId`**.\n**Optional:** `review` (defaults to `''`).\n\n> ⚠️ `rating` is parsed with `parseInt` and must land in **1–5**. Fractional values like `4.5` are truncated to `4`; `0` is rejected both by the range check and by the `!rating` guard.\n\n`(userId, productId, orderId)` is unique — a second review for the same product in the same order returns `409`.\n\n**Errors:** `400` missing required fields · `400` rating out of range · `404` product not found · `404` user not found · `409` already rated · `500` failed to create."
+          },
+          "response": [
+            {
+              "name": "Duplicate Rating",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"userId\": \"user_1\",\n  \"productId\": \"prod_almond\",\n  \"orderId\": \"order_1\"\n}" },
+                "url": { "raw": "{{base_url}}/api/ratings", "host": ["{{base_url}}"], "path": ["api", "ratings"] }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"You have already rated this product in this order\"\n}"
+            },
+            {
+              "name": "Rating Out of Range",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"rating\": 9,\n  \"userId\": \"user_1\",\n  \"productId\": \"prod_almond\",\n  \"orderId\": \"order_1\"\n}" },
+                "url": { "raw": "{{base_url}}/api/ratings", "host": ["{{base_url}}"], "path": ["api", "ratings"] }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Rating must be between 1 and 5\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Coupons",
+      "item": [
+        {
+          "name": "Get All Coupons",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array of coupons', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "    if (jsonData.length > 0) {",
+                  "        pm.expect(jsonData[0]).to.have.property('code');",
+                  "        pm.expect(jsonData[0]).to.have.property('discount');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/coupons",
+              "host": ["{{base_url}}"],
+              "path": ["api", "coupons"]
+            },
+            "description": "Fetch every coupon. Note this returns **all** coupons regardless of `isPublic` or `expiresAt` — filtering by audience and expiry is the caller's job."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": { "raw": "{{base_url}}/api/coupons", "host": ["{{base_url}}"], "path": ["api", "coupons"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "[\n  {\n    \"code\": \"NEW20\",\n    \"description\": \"20% Off for New Users\",\n    \"discount\": 20,\n    \"forNewUser\": true,\n    \"forMember\": false,\n    \"isPublic\": false,\n    \"expiresAt\": \"2026-12-31T00:00:00.000Z\",\n    \"createdAt\": \"2026-01-01T00:00:00.000Z\"\n  },\n  {\n    \"code\": \"PLUS10\",\n    \"description\": \"20% Off for Members\",\n    \"discount\": 10,\n    \"forNewUser\": false,\n    \"forMember\": true,\n    \"isPublic\": false,\n    \"expiresAt\": \"2027-03-06T00:00:00.000Z\",\n    \"createdAt\": \"2026-01-01T00:00:00.000Z\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Create Coupon",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Coupon.code is the primary key, so vary it to keep this re-runnable.",
+                  "pm.collectionVariables.set('new_coupon_code', 'PM' + Date.now().toString().slice(-6));"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has coupon code and discount', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('code');",
+                  "    pm.expect(jsonData.discount).to.equal(15);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{new_coupon_code}}\",\n  \"description\": \"15% off for new users\",\n  \"discount\": 15,\n  \"forNewUser\": true,\n  \"forMember\": false,\n  \"isPublic\": true,\n  \"expiresAt\": \"2026-12-31T23:59:59.000Z\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/coupons",
+              "host": ["{{base_url}}"],
+              "path": ["api", "coupons"]
+            },
+            "description": "Create a coupon (admin action).\n\n**Required:** `code` (the primary key — there is no separate id), `description`, `discount` (0–100 percentage), `expiresAt` (ISO 8601 datetime).\n**Optional:** `forNewUser`, `forMember`, `isPublic` — all default to `false`.\n\n**Errors:** `400` missing required fields · `400` discount must be between 0 and 100 · `409` coupon code already exists · `500` failed to create."
+          },
+          "response": [
+            {
+              "name": "Code Already Exists",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"code\": \"NEW20\",\n  \"description\": \"Duplicate\",\n  \"discount\": 20,\n  \"expiresAt\": \"2026-12-31T23:59:59.000Z\"\n}" },
+                "url": { "raw": "{{base_url}}/api/coupons", "host": ["{{base_url}}"], "path": ["api", "coupons"] }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"Coupon code already exists\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "SMS / OTP",
+      "item": [
+        {
+          "name": "Send OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('OTP sent', function () {",
+                  "    pm.expect(pm.response.json().success).to.equal(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"{{mobile}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sms/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sms", "send"]
+            },
+            "description": "Generate a 4-digit OTP and deliver it over WhatsApp via whapi.cloud.\n\nThe message body comes from the `OtpTemplate` row keyed `LOGIN_OTP`, which is auto-created on first use. The number is dialled as `91{mobile}` (India country code hardcoded), and the code is persisted to `OtpCode` with a **5-minute** expiry — but only *after* the provider accepts the send.\n\n**Required:** `mobile`, exactly 10 digits.\n\n**Errors:** `400` invalid mobile number · `500` `WHAPI_TOKEN` not configured · `502` SMS provider rejected the send · `500` internal error.\n\n> This hits a real paid provider. Without `WHAPI_TOKEN` set you get a `500` and no OTP row is written — to test `/verify` locally, insert an `OtpCode` row directly (e.g. via `npm run prisma:studio`)."
+          },
+          "response": [
+            {
+              "name": "Sent",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\"\n}" },
+                "url": { "raw": "{{base_url}}/api/sms/send", "host": ["{{base_url}}"], "path": ["api", "sms", "send"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OTP sent successfully\"\n}"
+            },
+            {
+              "name": "Provider Not Configured",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\"\n}" },
+                "url": { "raw": "{{base_url}}/api/sms/send", "host": ["{{base_url}}"], "path": ["api", "sms", "send"] }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"error\": \"SMS provider token not configured\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 or 400', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 400]);",
+                  "});",
+                  "",
+                  "pm.test('Body carries a success flag', function () {",
+                  "    pm.expect(pm.response.json()).to.have.property('success');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"{{mobile}}\",\n  \"otp\": \"{{otp}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/sms/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "sms", "verify"]
+            },
+            "description": "Check an OTP against the most recent matching, unused, unexpired `OtpCode` row and mark it used.\n\n**Required:** `mobile` (10 digits), `otp` (4 digits). Set the `otp` collection variable to the code you actually received — there is no fixed test code.\n\nUnlike the rest of the API, this endpoint's errors carry a `success: false` field alongside `error`.\n\n**Errors (all `400` unless noted):** mobile and OTP are required · invalid mobile format · invalid OTP format · OTP invalid or expired · `500` internal error.\n\n> Verification does not create a session or token — the frontend treats a `success: true` as proof and proceeds on its own."
+          },
+          "response": [
+            {
+              "name": "Verified",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\",\n  \"otp\": \"1234\"\n}" },
+                "url": { "raw": "{{base_url}}/api/sms/verify", "host": ["{{base_url}}"], "path": ["api", "sms", "verify"] }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"message\": \"OTP verified\"\n}"
+            },
+            {
+              "name": "Invalid or Expired",
+              "originalRequest": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\",\n  \"otp\": \"0000\"\n}" },
+                "url": { "raw": "{{base_url}}/api/sms/verify", "host": ["{{base_url}}"], "path": ["api", "sms", "verify"] }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"error\": \"OTP invalid or expired\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000",
+      "type": "string",
+      "description": "Backend origin. Resource routes live under /api; /health does not."
+    },
+    {
+      "key": "mobile",
+      "value": "1234567890",
+      "type": "string",
+      "description": "Seeded customer mobile (password: password123)"
+    },
+    {
+      "key": "password",
+      "value": "password123",
+      "type": "string",
+      "description": "Password for all seeded users"
+    },
+    {
+      "key": "admin_mobile",
+      "value": "0987654321",
+      "type": "string",
+      "description": "Seeded admin/second user mobile (password: password123)"
+    },
+    {
+      "key": "user_id",
+      "value": "user_31dQbH27HVtovbs13X2cmqefddM",
+      "type": "string",
+      "description": "Seeded user id. Overwritten by the Login and Create User requests."
+    },
+    {
+      "key": "product_id",
+      "value": "prod_almond",
+      "type": "string",
+      "description": "Seeded product id. Overwritten by Get All Products / Create Product."
+    },
+    {
+      "key": "order_id",
+      "value": "cmemm75h5001jtat89016h1p3",
+      "type": "string",
+      "description": "Seeded order id. Overwritten by Get All Orders / Create Order."
+    },
+    {
+      "key": "address_id",
+      "value": "addr_1",
+      "type": "string",
+      "description": "Seeded address id. Overwritten by Get Addresses by User / Create Address."
+    },
+    {
+      "key": "coupon_code",
+      "value": "OFF10",
+      "type": "string",
+      "description": "Seeded public coupon code"
+    },
+    {
+      "key": "otp",
+      "value": "1234",
+      "type": "string",
+      "description": "Set this to the OTP actually received — there is no fixed test code."
+    },
+    { "key": "new_user_id", "value": "", "type": "string", "description": "Set by the Create User pre-request script" },
+    { "key": "new_user_mobile", "value": "", "type": "string", "description": "Set by the Create User pre-request script" },
+    { "key": "new_coupon_code", "value": "", "type": "string", "description": "Set by the Create Coupon pre-request script" }
+  ]
+}

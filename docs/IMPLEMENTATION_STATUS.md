@@ -25,7 +25,7 @@ The Mangal Superfoods backend API has strong foundational implementation with al
 - [x] Health check endpoint
 
 **Files:**
-- `src/app.js` - Express app fully configured
+- `server.js` - Express app fully configured (setup + listener in one file)
 - `src/lib/prisma.js` - Prisma client with memoization
 - `src/lib/s3.js` - S3 client with proper configuration
 

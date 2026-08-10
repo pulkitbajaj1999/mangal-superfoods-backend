@@ -194,9 +194,8 @@ docker-compose build
 
 ```
 mangal-superfoods-backend/
-├── server.js                 # Entry point
+├── server.js                 # Entry point: Express app setup + listener
 ├── src/
-│   ├── app.js               # Express app setup
 │   ├── routes/              # API routes
 │   │   ├── users.js
 │   │   ├── auth.js
@@ -213,7 +212,6 @@ mangal-superfoods-backend/
 │   ├── schema.prisma        # Database schema
 │   └── seed.mjs             # Seed script
 ├── docs/                    # Documentation
-├── mockdata/                # Sample data
 ├── sampleimages/            # Sample images
 ├── .env.example             # Environment template
 ├── .env.local               # Your local config (gitignored)

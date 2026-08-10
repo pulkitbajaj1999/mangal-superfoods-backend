@@ -41,12 +41,13 @@ endpoints locally.
 
 ## Architecture
 
-- `server.js` — entry point: loads `.env` via `dotenv/config`, starts the Express app from `src/app.js`.
-- `src/app.js` — Express app setup: CORS (allowlist parsed from `FRONTEND_ORIGIN`), `express.json()` body
-  parsing, route mounting under `/api/<resource>`, and a catch-all error handler at the bottom (route
-  handlers are expected to catch their own errors and respond with a JSON `{ error }` body + status code;
-  the app-level handler only catches genuinely unexpected failures, e.g. malformed JSON bodies).
-- `src/routes/*.js` — one Express router per resource, each mounted in `src/app.js`. Handlers follow a
+- `server.js` — the whole entry point, app setup and listener in one file: loads `.env` via
+  `dotenv/config`, CORS (allowlist parsed from `FRONTEND_ORIGIN`), `express.json()` body parsing, route
+  mounting under `/api/<resource>`, a catch-all error handler at the bottom, then `app.listen`. Route
+  handlers are expected to catch their own errors and respond with a JSON `{ error }` body + status
+  code; the app-level handler only catches genuinely unexpected failures, e.g. malformed JSON bodies.
+  There is no separate `src/app.js` — don't reintroduce one; add new middleware and route mounts here.
+- `src/routes/*.js` — one Express router per resource, each mounted in `server.js`. Handlers follow a
   consistent shape: destructure/validate `request.body` or `request.params`/`request.query`, call
   `prisma.<model>.*`, wrap in try/catch, respond with the created/updated resource or a
   `{ error: '...' }` message. Match this shape for new endpoints rather than introducing a different
@@ -78,9 +79,13 @@ endpoints locally.
   model — this is a single-vendor store. Each model has a `// Required for creating a <Model>: ...`
   comment listing the fields a create call must supply — keep these comments in sync when changing
   required fields.
-- `prisma/seed.mjs` — standalone seed script (own `PrismaClient`/adapter setup, not `src/lib/prisma.js`)
-  driven by `mockdata/dummy_data.js`; rewrites bare image keys to full LocalStack S3 URLs before writing
-  `Product` rows.
+- `prisma/seed.mjs` — standalone seed script (own `PrismaClient`/adapter setup, not `src/lib/prisma.js`).
+  All seed data is inlined in this file as plain literals — there is **no** external fixture file to
+  import, so seed content is changed here and nowhere else. (It was originally transcribed by hand from
+  `mockdata/dummy_data.js`, a copy of the frontend's `assets/assets.js`; that file has been deleted and
+  some comments in `seed.mjs` still name its exports.) The script rewrites bare image keys to full
+  LocalStack S3 URLs (`toS3Url`) before writing `Product` rows, so `npm run init:s3` must have populated
+  the bucket first or the stored URLs point at nothing.
 
 ## Notable conventions / gaps to be aware of
 

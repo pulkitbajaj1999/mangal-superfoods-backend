@@ -278,9 +278,11 @@ npm run db:seed
 ```
 
 This runs `prisma/seed.mjs`, which:
-- Uses mock data from `mockdata/dummy_data.js`
+- Uses sample data inlined directly in the script (no external fixture file)
 - Generates LocalStack S3 URLs for product images
 - Creates sample users, products, orders, and ratings
+
+To change what gets seeded, edit `prisma/seed.mjs` itself.
 
 ---
 

@@ -51,9 +51,8 @@
 
 ```
 mangal-superfoods-backend/
-├── server.js                    # Entry point
+├── server.js                    # Entry point: Express app setup + listener
 ├── src/
-│   ├── app.js                   # Express app setup
 │   ├── routes/                  # Route handlers
 │   │   ├── products.js          # Product CRUD
 │   │   ├── orders.js            # Order management
@@ -68,9 +67,7 @@ mangal-superfoods-backend/
 │       └── s3.js                # S3/LocalStack config
 ├── prisma/
 │   ├── schema.prisma            # Data models
-│   └── seed.mjs                 # Database seeding script
-├── mockdata/
-│   └── dummy_data.js            # Test fixtures
+│   └── seed.mjs                 # Database seeding script (sample data inlined)
 ├── .env.example                 # Environment template
 └── docker-compose.yml           # Local Postgres + LocalStack
 
@@ -142,7 +139,7 @@ NODE_ENV=development
 
 ## Phase 1: Core Infrastructure
 
-### 1.1 Express App Setup (src/app.js)
+### 1.1 Express App Setup (server.js)
 
 **Status:** ✅ Implemented
 
@@ -159,7 +156,7 @@ NODE_ENV=development
 - [ ] Test with curl: `curl -X OPTIONS http://localhost:4000/api/products`
 
 **Related Files:**
-- `src/app.js`
+- `server.js`
 - `.env` / `FRONTEND_ORIGIN` setting
 
 ---
@@ -272,7 +269,7 @@ GET /api/users?mobile=9999999999
 
 **Related Files:**
 - `src/routes/users.js` → GET handler
-- `mockdata/dummy_data.js` → seed users with different mobiles
+- `prisma/seed.mjs` → seeds users with different mobiles
 
 ---
 
@@ -1771,8 +1768,7 @@ try {
 - **Frontend API Spec:** `/references/api-structure.md`
 - **Frontend Architecture:** `/references/frontend-architecture.md`
 - **Prisma Schema:** `prisma/schema.prisma`
-- **Seed Data:** `prisma/seed.mjs`
-- **Mock Data:** `mockdata/dummy_data.js`
+- **Seed Data:** `prisma/seed.mjs` (sample data inlined; no separate fixture file)
 
 ---
 

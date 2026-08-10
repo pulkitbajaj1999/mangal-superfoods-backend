@@ -1,0 +1,76 @@
+{
+  // Debug configs for mangal-superfoods-backend running under Bun.
+  //
+  // REQUIRES the Bun VS Code extension: `oven.bun-vscode` (not currently installed).
+  //   code --install-extension oven.bun-vscode
+  // Without it VS Code rejects `"type": "bun"` with "configuration type not supported".
+  //
+  // Why not `"type": "node"`? Bun runs on JavaScriptCore and speaks the WebKit
+  // Inspector Protocol on port 6499. VS Code's built-in Node debugger speaks the
+  // Chrome DevTools Protocol on 9229. They are different wire protocols — the Node
+  // adapter cannot attach to a Bun process at all.
+  //
+  // Bun's own docs call this extension buggy and recommend the web debugger instead.
+  // If a config below misbehaves, run `bun run dev:debug` and open the URL Bun prints
+  // (https://debug.bun.sh/#localhost:6499/mangal) — that path needs no extension.
+  //
+  // Bun loads `.env` natively, so no `envFile` is needed. The `import 'dotenv/config'`
+  // in server.js is redundant under Bun but harmless.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Default. VS Code owns the process, so breakpoints bind before any code runs —
+      // the only config that catches startup work (pg.Pool in src/lib/prisma.js,
+      // the FRONTEND_ORIGIN parsing in server.js).
+      "name": "Debug API Server (Bun)",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.js",
+      "cwd": "${workspaceFolder}",
+      "stopOnEntry": false
+    },
+    {
+      // Same, plus Bun's --watch. Good for edit-and-resend loops against the Postman
+      // collection; a save while paused ends the session, so prefer the config above
+      // for careful stepping.
+      // NOTE: `watchMode` could not be verified against the extension's schema (the
+      // extension isn't installed here). If VS Code rejects it, delete the property and
+      // use the verified `bun run dev:debug` + "Attach to Bun Inspector" flow instead.
+      "name": "Debug API Server (Bun, watch)",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/server.js",
+      "cwd": "${workspaceFolder}",
+      "watchMode": true
+    },
+    {
+      // Attach to a server you started yourself with `bun run dev:debug`.
+      // That script pins the inspector path to /mangal, so this URL is stable —
+      // a bare `bun --inspect` generates a random token per boot (ws://localhost:6499/f0hi9axuhqj)
+      // which would make any hardcoded URL here wrong on every restart.
+      "name": "Attach to Bun Inspector",
+      "type": "bun",
+      "request": "attach",
+      "url": "ws://localhost:6499/mangal"
+    },
+    {
+      // prisma/seed.mjs builds its own PrismaClient/adapter rather than using
+      // src/lib/prisma.js, so it needs a standalone launch.
+      // Requires Postgres up (`docker compose up -d`).
+      "name": "Debug Seed Script (Bun)",
+      "type": "bun",
+      "request": "launch",
+      "program": "${workspaceFolder}/prisma/seed.mjs",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      // Runs whichever .js/.mjs file is focused — for scratch scripts that import
+      // src/lib/prisma.js directly.
+      "name": "Debug Current File (Bun)",
+      "type": "bun",
+      "request": "launch",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

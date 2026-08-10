@@ -36,12 +36,35 @@ Complete documentation is available in the `docs/` folder:
 
 | Document | Purpose |
 |----------|---------|
-| [API_REFERENCE.md](docs/API_REFERENCE.md) | All endpoints with examples |
-| [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) | Prisma models and relations |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment guide |
+| [API_REFERENCE.md](docs/API_REFERENCE.md) | All endpoints with request/response examples, status codes, cURL tests |
+| [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) | Prisma models, relations, constraints, query patterns |
 | [SETUP_INSTRUCTIONS.md](docs/SETUP_INSTRUCTIONS.md) | Quick start guide |
-| [IMPLEMENTATION_STATUS.md](../IMPLEMENTATION_STATUS.md) | Current implementation status |
-| [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Original roadmap |
+| [SEED_AND_TESTING.md](docs/SEED_AND_TESTING.md) | Database seeding and integration testing |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Production deployment guide |
+| [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) | Current implementation status |
+| [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Original roadmap, phase-by-phase checklists |
+
+Frontend integration references live in `references/`:
+
+| Document | Purpose |
+|----------|---------|
+| [api-structure.md](references/api-structure.md) | Frontend's API expectations, mock data structures, integration examples |
+| [frontend-architecture.md](references/frontend-architecture.md) | Frontend/backend split and how the frontend consumes these APIs |
+
+A [Postman collection](postman-collection.json) covering every endpoint is checked in at the repo root.
+
+### Recommended reading order
+
+**New to the project:** this README → [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) → [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) → [API_REFERENCE.md](docs/API_REFERENCE.md) → [api-structure.md](references/api-structure.md)
+
+**Building a new endpoint:**
+1. **Plan** — find the phase in [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)
+2. **Validate** — check field requirements in [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md)
+3. **Implement** — follow the existing patterns in `src/routes/`
+4. **Test** — use the cURL examples in [API_REFERENCE.md](docs/API_REFERENCE.md)
+5. **Document** — update [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md)
+
+**Debugging:** compare expected behavior in [API_REFERENCE.md](docs/API_REFERENCE.md) → check the data model in [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) → reproduce with cURL.
 
 ---
 
@@ -78,9 +101,8 @@ Complete documentation is available in the `docs/` folder:
 
 ```
 mangal-superfoods-backend/
-├── server.js                 # Entry point
+├── server.js                 # Entry point: Express app setup + listener
 ├── src/
-│   ├── app.js               # Express app setup
 │   ├── routes/              # API route handlers (8 modules)
 │   │   ├── auth.js          # Authentication
 │   │   ├── users.js         # User management
@@ -97,7 +119,38 @@ mangal-superfoods-backend/
 │   ├── schema.prisma        # Database schema
 │   └── seed.mjs             # Database seeding
 ├── docs/                    # Documentation
+├── references/              # Frontend API expectations
 └── docker-compose.yml       # Development environment
+```
+
+### Stack
+
+- **Express.js** — HTTP server
+- **Prisma** — ORM for database operations
+- **PostgreSQL** — Main database
+- **S3 (LocalStack)** — Image storage
+- **whapi.cloud** — WhatsApp/SMS OTP delivery
+
+### API design principles
+
+1. **Consistent error handling** — all errors follow the `{ error: "message" }` format
+2. **Nested relations** — use Prisma's `include` for related data
+3. **Nested creates** — order creation writes `Order` + `OrderItem` rows in one call
+4. **Image uploads** — FormData via multer, S3 URLs stored in the database
+5. **OTP expiry** — 5-minute TTL, single-use validation
+
+### Data flow
+
+```
+Frontend (Next.js)
+    ↓ HTTP Request
+Express Routes (src/routes/*.js)
+    ↓ Input Validation
+Prisma ORM Query
+    ↓
+PostgreSQL Database
+    ↓ JSON Response
+Frontend
 ```
 
 ---
@@ -184,11 +237,13 @@ See `.env.example` and [DEPLOYMENT.md](docs/DEPLOYMENT.md) for more details.
 | 8. Testing & Docs | ✅ Complete | 90% |
 | **OVERALL** | **75%** | **Ready for Testing** |
 
-See [IMPLEMENTATION_STATUS.md](../IMPLEMENTATION_STATUS.md) for detailed breakdown.
+See [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for detailed breakdown.
 
 ---
 
 ## 🧪 Testing
+
+There is no automated test framework configured — endpoints are verified manually with cURL or the Postman collection.
 
 ### Quick Test
 ```bash
@@ -209,7 +264,23 @@ curl -X POST http://localhost:4000/api/users \
   }'
 ```
 
-See [API_REFERENCE.md](docs/API_REFERENCE.md) for all endpoint examples.
+### Manual test coverage
+
+Each endpoint should be exercised for:
+- Valid input → 200/201
+- Missing required fields → 400
+- Non-existent resource → 404
+- Duplicate/conflict → 409
+- Error scenarios specific to that endpoint
+
+### Integration flows
+
+1. **Auth** — signup → login → profile update
+2. **Product** — list → detail → search
+3. **Order** — create address → apply coupon → create order
+4. **Review** — view product → submit rating
+
+See [API_REFERENCE.md](docs/API_REFERENCE.md) for all endpoint examples and [SEED_AND_TESTING.md](docs/SEED_AND_TESTING.md) for seeded test data.
 
 ---
 
@@ -228,6 +299,19 @@ See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for:
 - AWS deployment
 - Environment configuration
 - Monitoring setup
+
+### Deployment checklist
+
+- [ ] All environment variables configured
+- [ ] Database migrations applied
+- [ ] S3 bucket created and accessible
+- [ ] WhatsApp API token valid
+- [ ] CORS origin configured for frontend
+- [ ] SSL certificates ready (HTTPS)
+- [ ] Error logging enabled
+- [ ] Database backups scheduled
+- [ ] Rate limiting configured (optional)
+- [ ] Health check endpoint (optional)
 
 ---
 
@@ -263,6 +347,8 @@ The database includes 8 main models:
 7. **Coupon** - Promotional codes
 8. **OtpCode** - One-time password tracking
 
+Plus `OtpTemplate` for the WhatsApp message body, and the `UserRole` / `OrderStatus` / `PaymentMethod` enums.
+
 See [DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) for complete schema.
 
 ---
@@ -281,7 +367,7 @@ npm run prisma:generate        # Generate Prisma client
 npm run prisma:migrate:dev     # Create/apply migration
 npm run prisma:migrate:deploy  # Apply in production
 npm run db:seed                # Seed sample data
-npm run prisma:studio          # GUI database tool
+npm run prisma:studio          # GUI database tool (http://localhost:5555)
 
 # S3
 npm run init:s3                # Create bucket & upload images
@@ -303,7 +389,23 @@ docker-compose ps
 
 # Restart services
 docker-compose restart
+
+# Verify DATABASE_URL directly
+psql $DATABASE_URL
+
+# Check migration state
+npx prisma migrate status
 ```
+
+### S3 upload fails
+- Ensure LocalStack is running: `docker-compose up -d`
+- Create the bucket: `npm run init:s3`
+- Verify the AWS credentials in `.env`
+
+### WhatsApp OTP not sending
+- Verify `WHAPI_TOKEN` is valid
+- Check the mobile number format (10 digits)
+- Review the whapi.cloud dashboard for delivery errors
 
 ### Prisma sync error
 ```bash
@@ -325,7 +427,7 @@ Before production deployment, implement:
 5. **Request logging** - Add logging middleware
 6. **Pagination** - Add limit/offset to list endpoints
 
-See [IMPLEMENTATION_STATUS.md](../IMPLEMENTATION_STATUS.md) for complete list.
+See [IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for complete list.
 
 ---
 
@@ -333,9 +435,13 @@ See [IMPLEMENTATION_STATUS.md](../IMPLEMENTATION_STATUS.md) for complete list.
 
 - Prisma client memoized in development for --watch stability
 - Connection pooling configured for PostgreSQL
+- Use `include` to fetch related data and avoid N+1 queries
 - S3 operations async with proper error handling
+- Images stored under unique keys: `products/{productId}/{filename}`
 - Indexes on mobile field for quick lookups
-- Database relations optimized with includes
+- Pagination recommended for large result sets
+
+Future: Redis for OTP codes, caching for popular products, session storage for authenticated users.
 
 ---
 
@@ -364,6 +470,8 @@ For issues or questions:
 3. See [DEPLOYMENT.md](docs/DEPLOYMENT.md) troubleshooting
 4. Check application logs
 
+External docs: [Prisma](https://www.prisma.io/docs/) · [Express.js](https://expressjs.com/)
+
 ---
 
 ## 📄 License
@@ -378,6 +486,6 @@ Built with Express.js, Prisma, and PostgreSQL.
 
 ---
 
-**Last Updated:** 2026-08-08  
+**Last Updated:** 2026-08-11  
 **API Version:** 1.0  
 **Status:** Ready for Testing ✅
