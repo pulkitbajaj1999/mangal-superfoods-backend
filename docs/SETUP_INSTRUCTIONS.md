@@ -48,7 +48,7 @@ npm run prisma:generate
 npm run prisma:migrate:dev --name init
 
 # Seed with sample data
-npm run db:seed
+npm run prisma:db:seed
 ```
 
 ### 4. Setup S3 Storage (1 min)
@@ -163,7 +163,7 @@ npm start
 
 # Database
 npm run prisma:migrate:dev         # Create migration
-npm run db:seed                    # Seed data
+npm run prisma:db:seed                    # Seed data
 npm run prisma:studio              # GUI database tool
 
 # S3

@@ -119,7 +119,7 @@ NODE_ENV=development
    npm run prisma:migrate:dev --name init
 
    # Seed with dummy data
-   npm run db:seed
+   npm run prisma:db:seed
    ```
 
 3. **S3 Setup (LocalStack)**

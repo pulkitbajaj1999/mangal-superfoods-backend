@@ -19,11 +19,12 @@ npm run start                  # run the API without --watch
 npm run prisma:generate        # regenerate the Prisma client
 npm run prisma:migrate:dev     # create/apply a dev migration
 npm run prisma:migrate:deploy  # apply migrations in production
+npm run prisma:migrate:reset   # DESTRUCTIVE: drop + re-migrate the dev DB, then reseed it
 npm run prisma:studio          # open Prisma Studio
 npm run prisma:db:push         # push schema changes without a migration
 npm run prisma:db:pull         # introspect the DB into the schema
 npm run prisma:format          # format schema.prisma
-npm run db:seed                # run prisma/seed.mjs
+npm run prisma:db:seed         # run the configured seed (prisma db seed -> bun prisma/seed.mjs)
 npm run init:s3                # create the local S3 bucket and sync sampleimages/ into it
 ```
 

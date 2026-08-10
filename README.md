@@ -15,7 +15,7 @@ docker-compose up -d
 
 # 3. Setup database
 npm run prisma:migrate:dev --name init
-npm run db:seed
+npm run prisma:db:seed
 
 # 4. Initialize S3 bucket
 npm run init:s3
@@ -366,7 +366,7 @@ npm start                      # Start server
 npm run prisma:generate        # Generate Prisma client
 npm run prisma:migrate:dev     # Create/apply migration
 npm run prisma:migrate:deploy  # Apply in production
-npm run db:seed                # Seed sample data
+npm run prisma:db:seed                # Seed sample data
 npm run prisma:studio          # GUI database tool (http://localhost:5555)
 
 # S3

@@ -26,7 +26,7 @@ bun install
 bun run prisma:migrate:dev -- --name init
 
 # 4. Seed the database
-bun run db:seed
+bun run prisma:db:seed
 
 # 5. Initialize S3 with sample images
 bun run init:s3
@@ -42,7 +42,7 @@ bun run dev
 
 ## 📊 Seeded Data Overview
 
-After running `bun run db:seed`, the database contains:
+After running `bun run prisma:db:seed`, the database contains:
 
 | Entity | Count | Details |
 |--------|-------|---------|
