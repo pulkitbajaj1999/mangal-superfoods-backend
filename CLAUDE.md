@@ -84,9 +84,12 @@ endpoints locally.
   All seed data is inlined in this file as plain literals — there is **no** external fixture file to
   import, so seed content is changed here and nowhere else. (It was originally transcribed by hand from
   `mockdata/dummy_data.js`, a copy of the frontend's `assets/assets.js`; that file has been deleted and
-  some comments in `seed.mjs` still name its exports.) The script rewrites bare image keys to full
-  LocalStack S3 URLs (`toS3Url`) before writing `Product` rows, so `npm run init:s3` must have populated
-  the bucket first or the stored URLs point at nothing. Every seeded row's uuid is hardcoded in the `ID`
+  some comments in `seed.mjs` still name its exports.) The script rewrites bare image keys
+  (`techitems/product_img4.png`) to full S3 URLs (`toS3Url`) before writing `Product` rows, using
+  `S3_ENDPOINT`/`BUCKET_NAME` from the environment and falling back to the LocalStack defaults
+  (`http://localhost:4566` / `mangal-superfoods-bucket`) — so the same seed yields LocalStack URLs
+  locally and Backblaze B2 URLs on the deployed instance. The bucket must already hold those keys
+  (`npm run init:s3` locally) or the stored URLs point at nothing. Every seeded row's uuid is hardcoded in the `ID`
   map at the top of the file (not generated) so the upserts stay idempotent — add an entry there rather
   than inlining a fresh uuid when adding seed rows.
 - `prisma.config.js` — Prisma 7 config: datasource URL from `DATABASE_URL` plus `migrations.seed`

@@ -93,8 +93,11 @@ const ID = {
 // Every seeded account shares the same password so the login flows are easy to exercise locally.
 const SEED_PASSWORD = 'asphalt8';
 
-const s3Host = 'http://localhost:4566';
-const s3Bucket = 'mangal-superfoods-bucket';
+// Image keys below are bare (`techitems/product_img4.png`); `toS3Url` expands them against whatever
+// bucket this environment points at, so the same seed produces LocalStack URLs locally and
+// Backblaze B2 URLs on the deployed instance. Falls back to the local LocalStack defaults.
+const s3Host = (process.env.S3_ENDPOINT || 'http://localhost:4566').replace(/\/+$/, '');
+const s3Bucket = process.env.BUCKET_NAME || 'mangal-superfoods-bucket';
 
 function toS3Url(key) {
   if (!key || typeof key !== 'string') return '';
@@ -796,10 +799,12 @@ async function main() {
   }
 
   for (const template of otpTemplates) {
+    // Match on `key`, not `id`: `key` is @unique and rows can be created at
+    // runtime by src/routes/sms.js with a generated uuid, so an id-based upsert
+    // would try to insert a duplicate key on an already-populated database.
     await prisma.otpTemplate.upsert({
-      where: { id: template.id },
+      where: { key: template.key },
       update: {
-        key: template.key,
         body: template.body,
       },
       create: template,
