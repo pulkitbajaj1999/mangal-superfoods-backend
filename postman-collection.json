@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "mangal-superfoods-api",
     "name": "Mangal Superfoods API",
-    "description": "Complete API collection for the Mangal Superfoods backend (Express + Prisma/Postgres).\n\n**Base URL:** `{{base_url}}` — defaults to `http://localhost:4000`. All resource routes are mounted under `/api`; `/health` is not.\n\n**Authentication:** none. There is no session/token middleware — every route is unprotected at the HTTP layer. Role checks (ADMIN/SELLER) are enforced client-side in the frontend only, so \"admin only\" notes below are conventions, not enforcement.\n\n**Sample data:** the variable defaults match `prisma/seed.mjs`. Run `npm run db:seed` first, and `npm run init:s3` before touching product image endpoints.\n\n**Docs:** `docs/API_REFERENCE.md`, `docs/DATABASE_SCHEMA.md`.",
+    "description": "Complete API collection for the Mangal Superfoods backend (Express + Prisma/Postgres).\n\n**Base URL:** `{{base_url}}` — defaults to `http://localhost:4000`. All resource routes are mounted under `/api`; `/health` is not.\n\n**Authentication:** none. There is no session/token middleware — every route is unprotected at the HTTP layer. Role checks (ADMIN/SELLER) are enforced client-side in the frontend only, so \"admin only\" notes below are conventions, not enforcement.\n\n**Sample data:** the variable defaults match `prisma/seed.mjs`. Run `npm run prisma:db:seed` first, and `npm run init:s3` before touching product image endpoints.\n\n**Docs:** `docs/API_REFERENCE.md`, `docs/DATABASE_SCHEMA.md`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -109,14 +109,14 @@
               "originalRequest": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\",\n  \"password\": \"password123\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"1234567890\",\n  \"password\": \"asphalt8\"\n}" },
                 "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
               },
               "status": "OK",
               "code": 200,
               "_postman_previewlanguage": "json",
               "header": [{ "key": "Content-Type", "value": "application/json" }],
-              "body": "{\n  \"success\": true,\n  \"user\": {\n    \"id\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n    \"name\": \"GreatStack\",\n    \"email\": \"greatstack@example.com\",\n    \"image\": \"http://localhost:4566/mangal-superfoods/gs_logo.jpg\",\n    \"cart\": {},\n    \"role\": \"CUSTOMER\",\n    \"mobile\": \"1234567890\",\n    \"firstName\": \"Great\",\n    \"lastName\": \"Stack\",\n    \"inactive\": false,\n    \"verifiedEmail\": true,\n    \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n    \"updatedAt\": \"2026-01-15T10:30:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"user\": {\n    \"id\": \"bccc5657-c249-4fea-97b6-7389389c8b27\",\n    \"name\": \"GreatStack\",\n    \"email\": \"greatstack@example.com\",\n    \"image\": \"http://localhost:4566/mangal-superfoods/gs_logo.jpg\",\n    \"cart\": {},\n    \"role\": \"CUSTOMER\",\n    \"mobile\": \"1234567890\",\n    \"firstName\": \"Great\",\n    \"lastName\": \"Stack\",\n    \"inactive\": false,\n    \"verifiedEmail\": true,\n    \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n    \"updatedAt\": \"2026-01-15T10:30:00.000Z\"\n  }\n}"
             },
             {
               "name": "Invalid Credentials",
@@ -137,7 +137,7 @@
               "originalRequest": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"9999999999\",\n  \"password\": \"password123\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"9999999999\",\n  \"password\": \"asphalt8\"\n}" },
                 "url": { "raw": "{{base_url}}/api/auth/login", "host": ["{{base_url}}"], "path": ["api", "auth", "login"] }
               },
               "status": "Not Found",
@@ -245,7 +245,7 @@
               "code": 200,
               "_postman_previewlanguage": "json",
               "header": [{ "key": "Content-Type", "value": "application/json" }],
-              "body": "{\n  \"id\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n  \"name\": \"GreatStack\",\n  \"email\": \"greatstack@example.com\",\n  \"image\": \"http://localhost:4566/mangal-superfoods/gs_logo.jpg\",\n  \"cart\": {},\n  \"role\": \"CUSTOMER\",\n  \"mobile\": \"1234567890\",\n  \"firstName\": \"Great\",\n  \"lastName\": \"Stack\",\n  \"inactive\": false,\n  \"verifiedEmail\": true,\n  \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n  \"updatedAt\": \"2026-01-15T10:30:00.000Z\"\n}"
+              "body": "{\n  \"id\": \"bccc5657-c249-4fea-97b6-7389389c8b27\",\n  \"name\": \"GreatStack\",\n  \"email\": \"greatstack@example.com\",\n  \"image\": \"http://localhost:4566/mangal-superfoods/gs_logo.jpg\",\n  \"cart\": {},\n  \"role\": \"CUSTOMER\",\n  \"mobile\": \"1234567890\",\n  \"firstName\": \"Great\",\n  \"lastName\": \"Stack\",\n  \"inactive\": false,\n  \"verifiedEmail\": true,\n  \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n  \"updatedAt\": \"2026-01-15T10:30:00.000Z\"\n}"
             },
             {
               "name": "User Not Found",
@@ -274,10 +274,10 @@
               "listen": "prerequest",
               "script": {
                 "exec": [
-                  "// User.id is caller-supplied (not cuid-generated) and mobile is unique,",
-                  "// so generate fresh values to keep this request re-runnable.",
+                  "// mobile is unique, so generate a fresh value to keep this request re-runnable.",
+                  "// id is optional (Prisma fills in a uuid v4); we send one so later requests can reuse it.",
                   "var stamp = Date.now().toString();",
-                  "pm.collectionVariables.set('new_user_id', 'user_pm_' + stamp);",
+                  "pm.collectionVariables.set('new_user_id', ('' + Math.random()).slice(2, 10).padEnd(8, '0') + '-0000-4000-8000-' + stamp.slice(-12).padStart(12, '0'));",
                   "pm.collectionVariables.set('new_user_mobile', '9' + stamp.slice(-9));"
                 ],
                 "type": "text/javascript"
@@ -310,7 +310,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{new_user_id}}\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"image\": \"\",\n  \"mobile\": \"{{new_user_mobile}}\",\n  \"password\": \"password123\",\n  \"cart\": {},\n  \"role\": \"CUSTOMER\"\n}",
+              "raw": "{\n  \"id\": \"{{new_user_id}}\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"image\": \"\",\n  \"mobile\": \"{{new_user_mobile}}\",\n  \"password\": \"asphalt8\",\n  \"cart\": {},\n  \"role\": \"CUSTOMER\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -318,7 +318,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "users"]
             },
-            "description": "Register a new user.\n\n**`id` is REQUIRED and caller-supplied** — unlike every other model, `User.id` is not cuid-generated. Omitting it returns `400 Missing required fields`. The pre-request script generates a unique `id` and `mobile` so the request stays re-runnable.\n\n**Required:** `id`, `name`.\n**Optional:** `email`, `image`, `mobile` (10 digits, unique), `password` (hashed with scrypt), `cart` (JSON, defaults `{}`), `role` (`CUSTOMER` | `ADMIN` | `SELLER`, defaults `CUSTOMER`).\n\n**Errors:** `400` missing `id`/`name` · `409` mobile already registered · `500` failed to create."
+            "description": "Register a new user.\n\n**`id` is optional** — like every other model, `User.id` defaults to a uuid v4 generated by Prisma. The pre-request script still supplies a unique `id` (plus a unique `mobile`) so the request stays re-runnable and later requests can reference the created user.\n\n**Required:** `name`.\n**Optional:** `email`, `image`, `mobile` (10 digits, unique), `password` (hashed with scrypt), `cart` (JSON, defaults `{}`), `role` (`CUSTOMER` | `ADMIN` | `SELLER`, defaults `CUSTOMER`).\n\n**Errors:** `400` missing `name` · `409` mobile already registered · `500` failed to create."
           },
           "response": [
             {
@@ -326,7 +326,7 @@
               "originalRequest": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"id\": \"user_pm_1\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"mobile\": \"9988776655\",\n  \"password\": \"password123\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"id\": \"user_pm_1\",\n  \"name\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"mobile\": \"9988776655\",\n  \"password\": \"asphalt8\"\n}" },
                 "url": { "raw": "{{base_url}}/api/users", "host": ["{{base_url}}"], "path": ["api", "users"] }
               },
               "status": "Created",
@@ -452,7 +452,7 @@
               "code": 200,
               "_postman_previewlanguage": "json",
               "header": [{ "key": "Content-Type", "value": "application/json" }],
-              "body": "[\n  {\n    \"id\": \"prod_almond\",\n    \"name\": \"Almond\",\n    \"description\": \"Premium California almonds packed with rich nutrients and a naturally crunchy taste...\",\n    \"mrp\": 520,\n    \"price\": 449,\n    \"images\": [\n      \"http://localhost:4566/mangal-superfoods/superfoods/almond.jpg\"\n    ],\n    \"category\": \"Dry Fruits\",\n    \"inStock\": true,\n    \"createdAt\": \"2026-01-10T08:00:00.000Z\",\n    \"updatedAt\": \"2026-01-15T10:30:00.000Z\",\n    \"rating\": [],\n    \"orderItems\": []\n  }\n]"
+              "body": "[\n  {\n    \"id\": \"546038e1-c243-446f-ba6c-40b4d0de8f11\",\n    \"name\": \"Almond\",\n    \"description\": \"Premium California almonds packed with rich nutrients and a naturally crunchy taste...\",\n    \"mrp\": 520,\n    \"price\": 449,\n    \"images\": [\n      \"http://localhost:4566/mangal-superfoods/superfoods/almond.jpg\"\n    ],\n    \"category\": \"Dry Fruits\",\n    \"inStock\": true,\n    \"createdAt\": \"2026-01-10T08:00:00.000Z\",\n    \"updatedAt\": \"2026-01-15T10:30:00.000Z\",\n    \"rating\": [],\n    \"orderItems\": []\n  }\n]"
             }
           ]
         },
@@ -680,7 +680,7 @@
               "originalRequest": {
                 "method": "DELETE",
                 "header": [],
-                "url": { "raw": "{{base_url}}/api/products/prod_1", "host": ["{{base_url}}"], "path": ["api", "products", "prod_1"] }
+                "url": { "raw": "{{base_url}}/api/products/f11b2f8f-c762-49af-98de-9d7ed27ad61f", "host": ["{{base_url}}"], "path": ["api", "products", "f11b2f8f-c762-49af-98de-9d7ed27ad61f"] }
               },
               "status": "OK",
               "code": 200,
@@ -693,7 +693,7 @@
               "originalRequest": {
                 "method": "DELETE",
                 "header": [],
-                "url": { "raw": "{{base_url}}/api/products/prod_almond", "host": ["{{base_url}}"], "path": ["api", "products", "prod_almond"] }
+                "url": { "raw": "{{base_url}}/api/products/546038e1-c243-446f-ba6c-40b4d0de8f11", "host": ["{{base_url}}"], "path": ["api", "products", "546038e1-c243-446f-ba6c-40b4d0de8f11"] }
               },
               "status": "Conflict",
               "code": 409,
@@ -815,7 +815,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"addressId\": \"{{address_id}}\",\n  \"total\": 672.3,\n  \"paymentMethod\": \"COD\",\n  \"isCouponUsed\": true,\n  \"coupon\": {\n    \"code\": \"OFF10\",\n    \"description\": \"10% Off for All Users\",\n    \"discount\": 10\n  },\n  \"orderItems\": [\n    {\n      \"productId\": \"prod_almond\",\n      \"quantity\": 1,\n      \"price\": 449\n    },\n    {\n      \"productId\": \"prod_alsi\",\n      \"quantity\": 2,\n      \"price\": 149\n    }\n  ]\n}",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"addressId\": \"{{address_id}}\",\n  \"total\": 672.3,\n  \"paymentMethod\": \"COD\",\n  \"isCouponUsed\": true,\n  \"coupon\": {\n    \"code\": \"OFF10\",\n    \"description\": \"10% Off for All Users\",\n    \"discount\": 10\n  },\n  \"orderItems\": [\n    {\n      \"productId\": \"546038e1-c243-446f-ba6c-40b4d0de8f11\",\n      \"quantity\": 1,\n      \"price\": 449\n    },\n    {\n      \"productId\": \"6019a122-04a2-4cb9-8606-21ef5e200837\",\n      \"quantity\": 2,\n      \"price\": 149\n    }\n  ]\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -831,14 +831,14 @@
               "originalRequest": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"userId\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n  \"addressId\": \"addr_1\",\n  \"total\": 672.3,\n  \"paymentMethod\": \"COD\",\n  \"orderItems\": [{ \"productId\": \"prod_almond\", \"quantity\": 1, \"price\": 449 }]\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"userId\": \"bccc5657-c249-4fea-97b6-7389389c8b27\",\n  \"addressId\": \"1fef2329-e3a3-4c20-a9be-4f0a47ce42ee\",\n  \"total\": 672.3,\n  \"paymentMethod\": \"COD\",\n  \"orderItems\": [{ \"productId\": \"546038e1-c243-446f-ba6c-40b4d0de8f11\", \"quantity\": 1, \"price\": 449 }]\n}" },
                 "url": { "raw": "{{base_url}}/api/orders", "host": ["{{base_url}}"], "path": ["api", "orders"] }
               },
               "status": "Created",
               "code": 201,
               "_postman_previewlanguage": "json",
               "header": [{ "key": "Content-Type", "value": "application/json" }],
-              "body": "{\n  \"id\": \"cm9generatedcuid0000000000\",\n  \"total\": 672.3,\n  \"status\": \"ORDER_PLACED\",\n  \"userId\": \"user_31dQbH27HVtovbs13X2cmqefddM\",\n  \"addressId\": \"addr_1\",\n  \"isPaid\": false,\n  \"paymentMethod\": \"COD\",\n  \"isCouponUsed\": false,\n  \"coupon\": {},\n  \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n  \"updatedAt\": \"2026-01-15T10:30:00.000Z\",\n  \"orderItems\": [\n    {\n      \"orderId\": \"cm9generatedcuid0000000000\",\n      \"productId\": \"prod_almond\",\n      \"quantity\": 1,\n      \"price\": 449,\n      \"product\": {}\n    }\n  ]\n}"
+              "body": "{\n  \"id\": \"4397eca9-d3eb-4e7e-b85b-e666ff440c48\",\n  \"total\": 672.3,\n  \"status\": \"ORDER_PLACED\",\n  \"userId\": \"bccc5657-c249-4fea-97b6-7389389c8b27\",\n  \"addressId\": \"1fef2329-e3a3-4c20-a9be-4f0a47ce42ee\",\n  \"isPaid\": false,\n  \"paymentMethod\": \"COD\",\n  \"isCouponUsed\": false,\n  \"coupon\": {},\n  \"createdAt\": \"2026-01-15T10:30:00.000Z\",\n  \"updatedAt\": \"2026-01-15T10:30:00.000Z\",\n  \"orderItems\": [\n    {\n      \"orderId\": \"4397eca9-d3eb-4e7e-b85b-e666ff440c48\",\n      \"productId\": \"546038e1-c243-446f-ba6c-40b4d0de8f11\",\n      \"quantity\": 1,\n      \"price\": 449,\n      \"product\": {}\n    }\n  ]\n}"
             },
             {
               "name": "Missing Required Fields",
@@ -1136,7 +1136,7 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"rating\": 5,\n  \"review\": \"Excellent quality almonds, very fresh and crunchy!\",\n  \"userId\": \"{{user_id}}\",\n  \"productId\": \"prod_almond\",\n  \"orderId\": \"{{order_id}}\"\n}",
+              "raw": "{\n  \"rating\": 5,\n  \"review\": \"Excellent quality almonds, very fresh and crunchy!\",\n  \"userId\": \"{{user_id}}\",\n  \"productId\": \"546038e1-c243-446f-ba6c-40b4d0de8f11\",\n  \"orderId\": \"{{order_id}}\"\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": {
@@ -1152,7 +1152,7 @@
               "originalRequest": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"userId\": \"user_1\",\n  \"productId\": \"prod_almond\",\n  \"orderId\": \"order_1\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"rating\": 5,\n  \"userId\": \"user_1\",\n  \"productId\": \"546038e1-c243-446f-ba6c-40b4d0de8f11\",\n  \"orderId\": \"order_1\"\n}" },
                 "url": { "raw": "{{base_url}}/api/ratings", "host": ["{{base_url}}"], "path": ["api", "ratings"] }
               },
               "status": "Conflict",
@@ -1166,7 +1166,7 @@
               "originalRequest": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": { "mode": "raw", "raw": "{\n  \"rating\": 9,\n  \"userId\": \"user_1\",\n  \"productId\": \"prod_almond\",\n  \"orderId\": \"order_1\"\n}" },
+                "body": { "mode": "raw", "raw": "{\n  \"rating\": 9,\n  \"userId\": \"user_1\",\n  \"productId\": \"546038e1-c243-446f-ba6c-40b4d0de8f11\",\n  \"orderId\": \"order_1\"\n}" },
                 "url": { "raw": "{{base_url}}/api/ratings", "host": ["{{base_url}}"], "path": ["api", "ratings"] }
               },
               "status": "Bad Request",
@@ -1444,11 +1444,11 @@
       "key": "mobile",
       "value": "1234567890",
       "type": "string",
-      "description": "Seeded customer mobile (password: password123)"
+      "description": "Seeded customer mobile (password: asphalt8)"
     },
     {
       "key": "password",
-      "value": "password123",
+      "value": "asphalt8",
       "type": "string",
       "description": "Password for all seeded users"
     },
@@ -1456,29 +1456,29 @@
       "key": "admin_mobile",
       "value": "0987654321",
       "type": "string",
-      "description": "Seeded admin/second user mobile (password: password123)"
+      "description": "Seeded admin/second user mobile (password: asphalt8)"
     },
     {
       "key": "user_id",
-      "value": "user_31dQbH27HVtovbs13X2cmqefddM",
+      "value": "bccc5657-c249-4fea-97b6-7389389c8b27",
       "type": "string",
       "description": "Seeded user id. Overwritten by the Login and Create User requests."
     },
     {
       "key": "product_id",
-      "value": "prod_almond",
+      "value": "546038e1-c243-446f-ba6c-40b4d0de8f11",
       "type": "string",
       "description": "Seeded product id. Overwritten by Get All Products / Create Product."
     },
     {
       "key": "order_id",
-      "value": "cmemm75h5001jtat89016h1p3",
+      "value": "4397eca9-d3eb-4e7e-b85b-e666ff440c48",
       "type": "string",
       "description": "Seeded order id. Overwritten by Get All Orders / Create Order."
     },
     {
       "key": "address_id",
-      "value": "addr_1",
+      "value": "1fef2329-e3a3-4c20-a9be-4f0a47ce42ee",
       "type": "string",
       "description": "Seeded address id. Overwritten by Get Addresses by User / Create Address."
     },

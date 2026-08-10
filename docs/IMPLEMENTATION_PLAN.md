@@ -307,7 +307,7 @@ GET /api/users?mobile=9999999999
 ```
 
 **Implementation Details:**
-- Generate unique user ID using `cuid()`
+- Generate unique user ID using `uuid(4)`
 - Hash password with `crypto.scryptSync`:
   ```javascript
   const salt = crypto.randomBytes(16).toString('hex');
@@ -322,7 +322,7 @@ GET /api/users?mobile=9999999999
 - [ ] Validate required fields (name, email, mobile, password)
 - [ ] Check mobile uniqueness before creation
 - [ ] Hash password with proper salt generation
-- [ ] Generate cuid for user.id
+- [ ] Generate uuid v4 for user.id
 - [ ] Set role = CUSTOMER
 - [ ] Return 201 with created user (no password)
 - [ ] Test duplicate mobile handling (409)
@@ -585,7 +585,7 @@ multipart/form-data:
    ```javascript
    const uploadedUrls = [];
    for (const file of req.files) {
-     const key = `products/${cuid()}/${file.originalname}`;
+     const key = `products/${randomUUID()}/${file.originalname}`;
      await s3Client.send(new PutObjectCommand({
        Bucket: BUCKET_NAME,
        Key: key,
@@ -615,7 +615,7 @@ multipart/form-data:
 - [ ] Upload images to S3 with unique keys
 - [ ] Handle S3 upload errors gracefully (400/500)
 - [ ] Create product with uploaded image URLs
-- [ ] Generate product.id with cuid()
+- [ ] Generate product.id with uuid(4)
 - [ ] Return 201 with created product
 - [ ] Test with valid images
 - [ ] Test with no images (400)
@@ -929,7 +929,7 @@ Use `prisma.order.create()` with nested `orderItems` create:
 ```javascript
 const order = await prisma.order.create({
   data: {
-    id: cuid(),
+    id: randomUUID(),
     total: req.body.total,
     status: 'ORDER_PLACED',
     paymentMethod: req.body.paymentMethod,
@@ -957,7 +957,7 @@ const order = await prisma.order.create({
 **Implementation Checklist:**
 - [ ] Validate required fields (userId, addressId, total, paymentMethod, orderItems)
 - [ ] Validate orderItems is non-empty array
-- [ ] Generate order.id with cuid()
+- [ ] Generate order.id with uuid(4)
 - [ ] Set status = 'ORDER_PLACED'
 - [ ] Set isPaid based on paymentMethod (COD = false, STRIPE = assume true)
 - [ ] Create order with nested orderItems in single transaction
@@ -1116,7 +1116,7 @@ const order = await prisma.order.create({
 - [ ] Validate required fields (userId, name, mobile, pincode, addressLine1, city, state)
 - [ ] Validate mobile format (10 digits)
 - [ ] Validate pincode format (6 digits)
-- [ ] Generate address.id with cuid()
+- [ ] Generate address.id with uuid(4)
 - [ ] Create: `prisma.address.create({ data })`
 - [ ] Return 201 with created address
 - [ ] Test with valid data
@@ -1323,7 +1323,7 @@ GET /api/ratings?productId=prod_id     # Ratings for specific product
 - [ ] Validate rating is 1-5 (or 1-5 with decimals)
 - [ ] Check product exists (404 if not)
 - [ ] Check user exists (404 if not)
-- [ ] Generate rating.id with cuid()
+- [ ] Generate rating.id with uuid(4)
 - [ ] Create: `prisma.rating.create({ data, include: { user, product } })`
 - [ ] Return 201 with created rating
 - [ ] Include user.name, user.image in response
@@ -1743,7 +1743,7 @@ try {
    - Frontend is responsible for enforcing permissions
 
 2. **ID Generation**
-   - Uses `cuid()` for most IDs
+   - Uses `uuid(4)` for most IDs
    - User.id is caller-supplied (needs clarification)
    - Coupon.code is its own primary key
 
@@ -1780,7 +1780,7 @@ try {
    npm install
    docker-compose up -d
    npm run prisma:migrate:dev
-   npm run db:seed
+   npm run prisma:db:seed
    npm run init:s3
    npm run dev
    ```

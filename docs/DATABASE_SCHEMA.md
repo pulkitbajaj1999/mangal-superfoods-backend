@@ -29,15 +29,15 @@ Comprehensive documentation of all Prisma data models, their relationships, cons
 
 | Model | Purpose | ID Type | Timestamps | Key Features |
 |-------|---------|---------|-----------|--------------|
-| `User` | Registered users with roles and cart state | UUID string (caller-supplied) | createdAt, updatedAt | Mobile unique, role-based |
-| `Product` | Storefront products with images and pricing | cuid() | createdAt, updatedAt | Stock status, image array |
-| `Order` | Customer orders with payment and status tracking | cuid() | createdAt, updatedAt | Status transitions, payment method |
+| `User` | Registered users with roles and cart state | uuid v4 | createdAt, updatedAt | Mobile unique, role-based |
+| `Product` | Storefront products with images and pricing | uuid v4 | createdAt, updatedAt | Stock status, image array |
+| `Order` | Customer orders with payment and status tracking | uuid v4 | createdAt, updatedAt | Status transitions, payment method |
 | `OrderItem` | Line items within orders | Composite (orderId + productId) | None | Price snapshot at purchase |
-| `Rating` | Product reviews and ratings by users | cuid() | createdAt, updatedAt | Unique per user/product/order |
-| `Address` | Delivery addresses for users | cuid() | createdAt only | Cascade delete with user |
+| `Rating` | Product reviews and ratings by users | uuid v4 | createdAt, updatedAt | Unique per user/product/order |
+| `Address` | Delivery addresses for users | uuid v4 | createdAt only | Cascade delete with user |
 | `Coupon` | Promotional discount codes | string (code) | createdAt | Primary key is code |
-| `OtpTemplate` | SMS OTP message templates | cuid() | createdAt, updatedAt | Auto-created on first use |
-| `OtpCode` | One-time password records for login | cuid() | createdAt only | Indexed on mobile for speed |
+| `OtpTemplate` | SMS OTP message templates | uuid v4 | createdAt, updatedAt | Auto-created on first use |
+| `OtpCode` | One-time password records for login | uuid v4 | createdAt only | Indexed on mobile for speed |
 
 ---
 
@@ -49,7 +49,7 @@ Represents a registered user with authentication, profile, and shopping cart dat
 
 | Field | Type | Default | Constraints | Description |
 |-------|------|---------|-------------|-------------|
-| `id` | String | — | @id | User identifier (supplied by caller, not auto-generated) |
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | User identifier (auto-generated; a caller-supplied id is still accepted) |
 | `name` | String | — | Required | User's display name |
 | `email` | String? | null | Optional | Email address |
 | `image` | String | — | Required | Profile image URL |
@@ -70,7 +70,7 @@ id, name, image, cart (optional JSON string)
 ```
 
 **Validation Rules:**
-- `id`: Must be provided by caller (typically UUID or similar); not auto-generated
+- `id`: Auto-generated uuid v4; `POST /api/users` also accepts one supplied by the caller
 - `name`: Non-empty string
 - `image`: Non-empty URL string
 - `mobile`: If provided, must be unique across all users
@@ -121,7 +121,7 @@ Represents a product in the storefront catalog.
 
 | Field | Type | Default | Constraints | Description |
 |-------|------|---------|-------------|-------------|
-| `id` | String | cuid() | @id, @default(cuid()) | Auto-generated product identifier |
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | Auto-generated product identifier |
 | `name` | String | — | Required | Product name |
 | `description` | String | — | Required | Detailed product description |
 | `mrp` | Float | — | Required | Maximum Retail Price |
@@ -202,7 +202,7 @@ Represents customer purchases with associated line items and payment details.
 
 | Field | Type | Default | Constraints | Description |
 |-------|------|---------|-------------|-------------|
-| `id` | String | cuid() | @id, @default(cuid()) | Auto-generated order identifier |
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | Auto-generated order identifier |
 | `total` | Float | — | Required | Order total amount |
 | `status` | OrderStatus | `ORDER_PLACED` | — | Status: `ORDER_PLACED`, `PROCESSING`, `SHIPPED`, `DELIVERED` |
 | `userId` | String | — | @relation | Foreign key to `User` |
@@ -343,7 +343,7 @@ Represents delivery addresses for users.
 
 | Field | Type | Default | Constraints | Description |
 |-------|------|---------|-------------|-------------|
-| `id` | String | cuid() | @id, @default(cuid()) | Auto-generated address identifier |
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | Auto-generated address identifier |
 | `userId` | String | — | @relation | Foreign key to `User` |
 | `name` | String | — | Required | Recipient name |
 | `mobile` | String | — | Required | Contact phone number |
@@ -418,7 +418,7 @@ Product reviews and ratings submitted by users after purchase.
 
 | Field | Type | Default | Constraints | Description |
 |-------|------|---------|-------------|-------------|
-| `id` | String | cuid() | @id, @default(cuid()) | Auto-generated rating identifier |
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | Auto-generated rating identifier |
 | `rating` | Int | — | Required | Star rating (typically 1-5) |
 | `review` | String | — | Required | Review text |
 | `userId` | String | — | @relation | Foreign key to `User` |
@@ -576,7 +576,7 @@ Message templates for OTP delivery.
 
 | Field | Type | Default | Constraints | Description |
 |-------|------|---------|-------------|-------------|
-| `id` | String | cuid() | @id, @default(cuid()) | Auto-generated template identifier |
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | Auto-generated template identifier |
 | `key` | String | — | @unique, Required | Template key/identifier |
 | `body` | String | — | Required | Message template body with placeholders |
 | `createdAt` | DateTime | now() | — | Creation timestamp |
@@ -615,7 +615,7 @@ One-time password records for login flow.
 
 | Field | Type | Default | Constraints | Description |
 |-------|------|---------|-------------|-------------|
-| `id` | String | cuid() | @id, @default(cuid()) | Auto-generated OTP record identifier |
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | Auto-generated OTP record identifier |
 | `mobile` | String | — | Required, @index | Phone number (indexed for lookup) |
 | `code` | String | — | Required | 4-digit OTP value |
 | `expiresAt` | DateTime | — | Required | OTP expiration time (5 minutes) |
@@ -771,11 +771,11 @@ User (id: string)
 ├── ←(userId)→ Rating (cascade delete: Yes - ratings deleted with user)
 ├── ←(userId)→ Address (cascade delete: Yes - addresses deleted with user)
 
-Product (id: cuid)
+Product (id: uuid v4)
 ├── ←(productId)→ OrderItem (cascade delete: No - item references remain)
 ├── ←(productId)→ Rating (cascade delete: Yes - ratings deleted with product)
 
-Order (id: cuid)
+Order (id: uuid v4)
 ├── →(userId) User (required)
 ├── →(addressId) Address (required)
 ├── ←(orderId)→ OrderItem (cascade delete: Yes - items deleted with order)
@@ -784,21 +784,21 @@ OrderItem (orderId, productId)
 ├── →(orderId) Order (cascade delete: Yes)
 └── →(productId) Product (no cascade)
 
-Address (id: cuid)
+Address (id: uuid v4)
 ├── →(userId) User (cascade delete: Yes)
 └── ←(addressId)→ Order (no cascade - order references remain)
 
-Rating (id: cuid)
+Rating (id: uuid v4)
 ├── →(userId) User (cascade delete: Yes)
 └── →(productId) Product (cascade delete: Yes)
 
 Coupon (code: string)
 └── Referenced in Order.coupon (JSON) - no database relation
 
-OtpTemplate (id: cuid)
+OtpTemplate (id: uuid v4)
 └── Message template (standalone)
 
-OtpCode (id: cuid)
+OtpCode (id: uuid v4)
 └── One-time use (standalone, indexed on mobile)
 ```
 

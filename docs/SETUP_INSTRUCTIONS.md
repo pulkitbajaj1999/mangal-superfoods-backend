@@ -137,17 +137,17 @@ curl -X POST http://localhost:4000/api/auth/login \
 After seeding, you have access to:
 
 **Users:**
-- Mobile: `1234567890` (GreatStack)
-- Mobile: `0987654321` (Great Stack)
-- Mobile: `1111111111` (Kristin Watson)
+- Mobile: `1234567890` (GreatStack, greatstack@yopmail.com)
+- Mobile: `0987654321` (Great Stack, great.stack@yopmail.com)
+- Mobile: `1111111111` (Kristin Watson, kristin.watson@yopmail.com)
+- Mobile: `9000000019` (Pulkit, pulkit19@yopmail.com)
+- Mobile: `9000000029` (Ravi, ravi19@yopmail.com — ADMIN)
 
-**Password:** All seed users have password `password123`
+**Password:** All seed users have password `asphalt8`
 
-**Products:**
-- Premium Almonds (prod_almond)
-- Premium Cashews (prod_kaju)
-- Flax Seeds (prod_alsi)
-- And 18 more...
+**Products:** (ids are uuid v4 — see the `ID` map in `prisma/seed.mjs`)
+- Almond, Kaju (Cashews), Alsi (Flax Seeds)
+- And 17 more...
 
 **Orders:**
 - Pre-created orders for testing

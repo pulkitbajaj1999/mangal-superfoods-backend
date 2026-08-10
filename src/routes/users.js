@@ -45,7 +45,7 @@ router.post('/', async (request, response) => {
   try {
     const { id, name, email, image, cart, mobile, password, role } = request.body;
 
-    if (!id || !name) {
+    if (!name) {
       return response.status(400).json({ error: 'Missing required fields' });
     }
 
@@ -61,7 +61,8 @@ router.post('/', async (request, response) => {
 
     const user = await prisma.user.create({
       data: {
-        id,
+        // omit `id` so Prisma's uuid v4 default generates one
+        ...(id ? { id } : {}),
         name,
         email: email || '',
         image: image || '',

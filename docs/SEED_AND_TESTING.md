@@ -46,40 +46,49 @@ After running `bun run prisma:db:seed`, the database contains:
 
 | Entity | Count | Details |
 |--------|-------|---------|
-| **Users** | 9 | 5 test users + admin + 3 customers |
+| **Users** | 7 | 5 mock users + `pulkit19` customer + `ravi19` admin |
 | **Products** | 20 | 12 tech items + 8 superfoods (almonds, cashews, etc.) |
-| **Orders** | 31 | Sample orders with items and addresses |
-| **Coupons** | 7 | 5 initial + 2 from tests |
-| **Ratings** | 5 | Product ratings with reviews |
-| **Addresses** | 4+ | User addresses |
+| **Orders** | 10 | 2 sample orders + 1 delivered order per rating |
+| **Coupons** | 5 | NEW20, NEW10, OFF20, OFF10, PLUS10 |
+| **Ratings** | 8 | Product ratings with reviews |
+| **Addresses** | 2 | User addresses |
 | **OTP Templates** | 3 | SMS/WhatsApp OTP templates |
+
+All ids are uuid v4 (`@default(uuid(4))` in the schema). The seed hardcodes its uuids in the `ID`
+map at the top of `prisma/seed.mjs` so re-running it upserts the same rows instead of duplicating
+them — copy ids from there (or from the API) rather than from the examples below.
 
 ### Test Users (with hashed passwords)
 
-All test users have password: `password123`
+All test users have password: `asphalt8`
 
-| Mobile | Name | Role | User ID |
-|--------|------|------|---------|
-| **1234567890** | GreatStack | CUSTOMER | user_31dQbH27HVtovbs13X2cmqefddM |
-| **0987654321** | Great Stack | CUSTOMER | user_31dOriXqC4TATvc0brIhlYbwwc5 |
-| **1111111111** | Kristin Watson | CUSTOMER | user_kristin_watson |
-| **2222222222** | Jenny Wilson | CUSTOMER | user_jenny_wilson |
-| **3333333333** | Bessie Cooper | CUSTOMER | user_bessie_cooper |
+| Mobile | Email | Name | Role | User ID |
+|--------|-------|------|------|---------|
+| **1234567890** | greatstack@yopmail.com | GreatStack | CUSTOMER | bccc5657-c249-4fea-97b6-7389389c8b27 |
+| **0987654321** | great.stack@yopmail.com | Great Stack | CUSTOMER | c2747c97-152c-49fe-9ba8-a2a72485c7b2 |
+| **1111111111** | kristin.watson@yopmail.com | Kristin Watson | CUSTOMER | 0f681416-7629-40d1-90c9-41bf08798613 |
+| **2222222222** | jenny.wilson@yopmail.com | Jenny Wilson | CUSTOMER | d3a68a06-676f-4c05-a65d-27ec7d07162b |
+| **3333333333** | bessie.cooper@yopmail.com | Bessie Cooper | CUSTOMER | f2e8ece9-c048-4d74-a888-dd7ed94dd1c6 |
+| **9000000019** | pulkit19@yopmail.com | Pulkit | CUSTOMER | c1c542f1-eb45-4d31-9689-99caa3617a27 |
+| **9000000029** | ravi19@yopmail.com | Ravi | ADMIN | 296b4dc6-1dfb-4355-bcb1-c5574304056a |
+
+`POST /api/auth/login` authenticates on **mobile + password**, so log in with the mobile column
+above and `asphalt8`.
 
 ### Sample Products
 
-**Superfoods:**
-- `prod_almond` - Premium California Almonds (₹449)
-- `prod_kaju` - Whole Cashew Nuts (₹699)
-- `prod_makhana` - Roasted Makhana (₹249)
-- `prod_alsi` - Roasted Flax Seeds (₹169)
-- `prod_dates` - Seedless Dates (₹299)
-- `prod_kishmish` - Golden Raisins (₹189)
-- `prod_pista` - Roasted Pistachios (₹799)
-- `prod_walnut` - Walnut Kernels (₹649)
+**Superfoods** (uuids in `ID.products` in `prisma/seed.mjs`):
+- Almond — ₹449 · `546038e1-c243-446f-ba6c-40b4d0de8f11`
+- Kaju (Cashews) — ₹599 · `ddef9f00-7ebb-4627-a159-fc57c7660295`
+- Alsi (Flax Seeds) — ₹149 · `6019a122-04a2-4cb9-8606-21ef5e200837`
+- Dates — ₹369 · `5f0035b2-b733-49bf-835f-0cea907528a2`
+- Kishmish (Raisins) — ₹199 · `90c844bf-aa0f-40db-b0bf-b41b6c1a0a06`
+- Makhana (Fox Nuts) — ₹299 · `5a9a1b28-aa93-4998-bf83-ead26ae2c6cc`
+- Pista (Pistachios) — ₹679 · `ba4416cc-0699-4a5c-a050-9038af135efa`
+- Walnut — ₹579 · `fd2c9ab5-b364-4931-b155-8c7c58104cce`
 
 **Tech Items:**
-- `prod_1` through `prod_12` - Various electronics
+- 12 electronics (table lamp through smart home cleaner) — see `ID.products` in `prisma/seed.mjs`
 
 ### Sample Coupons
 
@@ -161,14 +170,17 @@ The `prisma/seed.mjs` script performs the following:
 To customize seeded data, edit `prisma/seed.mjs`:
 
 ```javascript
+// Add a uuid v4 to the `ID` map at the top of the file so the row upserts stably,
+// e.g. ID.users.custom = '3f1c8b0a-...'; generate one with `bun -e "console.log(crypto.randomUUID())"`
+
 // Add new users
 const users = [
   {
-    id: 'user_custom_1',
+    id: ID.users.custom,
     name: 'Custom User',
     mobile: '9999999999',
-    email: 'custom@example.com',
-    password: 'mypassword123', // Will be hashed
+    email: 'custom@yopmail.com',
+    password: SEED_PASSWORD, // Will be hashed
     // ... other fields
   },
   // ... more users
@@ -177,7 +189,7 @@ const users = [
 // Add new products
 const products = [
   {
-    id: 'prod_custom',
+    id: ID.products.custom,
     name: 'Custom Product',
     mrp: 999,
     price: 799,
@@ -187,7 +199,7 @@ const products = [
 ];
 ```
 
-Then run: `bun run db:seed`
+Then run: `bun run prisma:db:seed`
 
 ---
 
@@ -274,16 +286,16 @@ curl -X POST http://localhost:4000/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{
     "mobile": "1234567890",
-    "password": "password123"
+    "password": "asphalt8"
   }'
 
 # Response (password not included)
 {
   "success": true,
   "user": {
-    "id": "user_31dQbH27HVtovbs13X2cmqefddM",
+    "id": "bccc5657-c249-4fea-97b6-7389389c8b27",
     "name": "GreatStack",
-    "email": "greatstack@example.com",
+    "email": "greatstack@yopmail.com",
     "mobile": "1234567890",
     "role": "CUSTOMER"
   }
@@ -311,14 +323,13 @@ curl http://localhost:4000/api/users | jq
 # Get user by mobile
 curl "http://localhost:4000/api/users?mobile=1234567890" | jq
 
-# Create new user
+# Create new user (`id` is optional — omit it and Prisma generates a uuid v4)
 curl -X POST http://localhost:4000/api/users \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "user_new",
     "name": "New User",
     "mobile": "9876543210",
-    "email": "newuser@example.com",
+    "email": "newuser@yopmail.com",
     "password": "secure123"
   }' | jq
 ```
@@ -330,7 +341,7 @@ curl -X POST http://localhost:4000/api/users \
 curl http://localhost:4000/api/products | jq
 
 # Get product details
-curl http://localhost:4000/api/products/prod_almond | jq
+curl http://localhost:4000/api/products/546038e1-c243-446f-ba6c-40b4d0de8f11 | jq
 
 # Filter products by category (via client logic)
 curl http://localhost:4000/api/products | jq '.[] | select(.category == "Dry Fruits")'
@@ -343,22 +354,22 @@ curl http://localhost:4000/api/products | jq '.[] | select(.category == "Dry Fru
 curl http://localhost:4000/api/orders | jq
 
 # Get user's orders
-curl "http://localhost:4000/api/orders?userId=user_31dQbH27HVtovbs13X2cmqefddM" | jq
+curl "http://localhost:4000/api/orders?userId=bccc5657-c249-4fea-97b6-7389389c8b27" | jq
 
 # Create order
 curl -X POST http://localhost:4000/api/orders \
   -H "Content-Type: application/json" \
   -d '{
     "total": 599.50,
-    "userId": "user_31dQbH27HVtovbs13X2cmqefddM",
-    "addressId": "addr_1",
+    "userId": "bccc5657-c249-4fea-97b6-7389389c8b27",
+    "addressId": "1fef2329-e3a3-4c20-a9be-4f0a47ce42ee",
     "isPaid": false,
     "paymentMethod": "COD",
     "isCouponUsed": false,
     "coupon": {},
     "orderItems": [
       {
-        "productId": "prod_almond",
+        "productId": "546038e1-c243-446f-ba6c-40b4d0de8f11",
         "quantity": 2,
         "price": 449
       }
@@ -392,7 +403,7 @@ curl -X POST http://localhost:4000/api/coupons \
 curl http://localhost:4000/api/ratings | jq
 
 # Get product ratings
-curl "http://localhost:4000/api/ratings?productId=prod_almond" | jq
+curl "http://localhost:4000/api/ratings?productId=546038e1-c243-446f-ba6c-40b4d0de8f11" | jq
 
 # Create rating
 curl -X POST http://localhost:4000/api/ratings \
@@ -400,9 +411,9 @@ curl -X POST http://localhost:4000/api/ratings \
   -d '{
     "rating": 5,
     "review": "Excellent quality!",
-    "userId": "user_31dQbH27HVtovbs13X2cmqefddM",
-    "productId": "prod_almond",
-    "orderId": "order_rating_prod_almond_user_31dQbH27HVtovbs13X2cmqefddM"
+    "userId": "bccc5657-c249-4fea-97b6-7389389c8b27",
+    "productId": "f11b2f8f-c762-49af-98de-9d7ed27ad61f",
+    "orderId": "4397eca9-d3eb-4e7e-b85b-e666ff440c48"
   }' | jq
 ```
 
@@ -430,7 +441,7 @@ Error: Unique constraint violation
 **Solution:**
 1. Check if database already has data: `bun run prisma:studio`
 2. Reset database: `bun run prisma:migrate:dev -- --name reset`
-3. Re-run seed: `bun run db:seed`
+3. Re-run seed: `bun run prisma:db:seed`
 
 ### Issue: S3 Uploads Fail
 
@@ -484,7 +495,7 @@ Before deploying to production:
 bun run prisma:migrate:dev -- --name reset
 
 # Reseed with fresh data
-bun run db:seed
+bun run prisma:db:seed
 ```
 
 ### Partial Reset (Delete Users)

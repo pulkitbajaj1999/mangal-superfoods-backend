@@ -7,9 +7,9 @@ datasource db {
   provider = "postgresql"
 }
 
-// Required for creating a User: id, name, email, image, cart (optional JSON string)
+// Required for creating a User: name, email, image, cart (optional JSON string); id defaults to a uuid v4
 model User {
-  id            String   @id
+  id            String   @id @default(uuid(4))
   name          String
   email         String?
   image         String
@@ -38,7 +38,7 @@ enum UserRole {
 
 // Required for creating a Product: name, description, mrp, price, images, category
 model Product {
-  id          String   @id @default(cuid())
+  id          String   @id @default(uuid(4))
   name        String
   description String
   mrp         Float
@@ -68,7 +68,7 @@ enum PaymentMethod {
 
 // Required for creating an Order: total, userId, addressId, isPaid, paymentMethod, isCouponUsed, coupon (JSON), orderItems (nested)
 model Order {
-  id            String        @id @default(cuid())
+  id            String        @id @default(uuid(4))
   total         Float
   status        OrderStatus   @default(ORDER_PLACED)
   userId        String
@@ -102,7 +102,7 @@ model OrderItem {
 
 // Required for creating a Rating: rating, review, userId, productId
 model Rating {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid(4))
   rating    Int
   review    String
   userId    String
@@ -120,13 +120,13 @@ model Rating {
 
 // Required for creating an Address: userId, name, mobile, pincode, addressLine1, addressLine2, landmark, city, state
 model Address {
-  id           String   @id @default(cuid())
+  id           String   @id @default(uuid(4))
   userId       String
   name         String
   mobile       String
   pincode      String
-  addressLine1  String?
-  addressLine2  String?
+  addressLine1 String?
+  addressLine2 String?
   landmark     String?
   city         String
   state        String
@@ -150,7 +150,7 @@ model Coupon {
 }
 
 model OtpTemplate {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid(4))
   key       String   @unique
   body      String
   createdAt DateTime @default(now())
@@ -158,7 +158,7 @@ model OtpTemplate {
 }
 
 model OtpCode {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid(4))
   mobile    String
   code      String
   expiresAt DateTime

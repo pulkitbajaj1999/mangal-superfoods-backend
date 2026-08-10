@@ -274,7 +274,7 @@ This introspects the database and updates `prisma/schema.prisma`.
 To populate the database with sample data:
 
 ```bash
-npm run db:seed
+npm run prisma:db:seed
 ```
 
 This runs `prisma/seed.mjs`, which:

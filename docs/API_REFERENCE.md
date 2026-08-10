@@ -127,7 +127,6 @@ Create a new user.
 **Request Body:**
 ```json
 {
-  "id": "unique_user_id",
   "name": "John Doe",
   "email": "john@example.com",
   "image": "https://example.com/image.jpg",
@@ -139,7 +138,7 @@ Create a new user.
 ```
 
 **Validation Rules:**
-- `id`: Required. Unique string identifier
+- `id`: Optional. Unique uuid v4 string; generated automatically when omitted
 - `name`: Required. Non-empty string
 - `email`: Optional. Valid email format
 - `image`: Optional. URL string
@@ -151,7 +150,7 @@ Create a new user.
 **Success Response (201):**
 ```json
 {
-  "id": "unique_user_id",
+  "id": "b0d9f2ce-0e1c-4a2b-9d3f-6a5f2c1e7d80",
   "name": "John Doe",
   "email": "john@example.com",
   "image": "https://example.com/image.jpg",
@@ -177,9 +176,8 @@ Create a new user.
 curl -X POST http://localhost:4000/api/users \
   -H "Content-Type: application/json" \
   -d '{
-    "id": "user_123",
     "name": "John Doe",
-    "email": "john@example.com",
+    "email": "john@yopmail.com",
     "mobile": "9876543210",
     "password": "secure_password"
   }'
@@ -320,7 +318,7 @@ Create a new product with images. Uploads images to S3-compatible storage.
 **Success Response (201):**
 ```json
 {
-  "id": "cuid_generated_id",
+  "id": "uuid_v4_generated_id",
   "name": "Organic Quinoa",
   "description": "Premium organic quinoa seeds",
   "mrp": 500,
