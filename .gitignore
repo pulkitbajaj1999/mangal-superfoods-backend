@@ -3,11 +3,8 @@
 
 # env files (can opt-in for committing if needed)
 .env
-.env.*.local
-.env.production
-.env.development
+.env.*
 !.env.example
-!.env.local
 
 # misc
 .DS_Store
