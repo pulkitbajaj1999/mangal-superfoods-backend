@@ -18,10 +18,11 @@ Comprehensive documentation of all Prisma data models, their relationships, cons
 6. [Rating Model](#rating-model)
 7. [Coupon Model](#coupon-model)
 8. [OTP Models](#otp-models)
-9. [Enums Reference](#enums-reference)
-10. [Relations Overview](#relations-overview)
-11. [Query Examples](#query-examples)
-12. [Cascade Deletes](#cascade-deletes)
+9. [Setting Model](#setting-model)
+10. [Enums Reference](#enums-reference)
+11. [Relations Overview](#relations-overview)
+12. [Query Examples](#query-examples)
+13. [Cascade Deletes](#cascade-deletes)
 
 ---
 
@@ -38,6 +39,7 @@ Comprehensive documentation of all Prisma data models, their relationships, cons
 | `Coupon` | Promotional discount codes | string (code) | createdAt | Primary key is code |
 | `OtpTemplate` | SMS OTP message templates | uuid v4 | createdAt, updatedAt | Auto-created on first use |
 | `OtpCode` | One-time password records for login | uuid v4 | createdAt only | Indexed on mobile for speed |
+| `Setting` | Application-level settings, one row per group | uuid v4 | createdAt, updatedAt | JSON value, key unique, public/private tier |
 
 ---
 
@@ -691,6 +693,102 @@ await prisma.otpCode.deleteMany({
 - Expiration validation is critical; expired OTPs should be rejected
 - Mobile index ensures fast lookups even with high OTP volume
 - No direct relations; completely self-contained
+
+---
+
+## Setting Model
+
+Application-level settings — store identity and postal address, support contacts, social links,
+business hours, commerce config, and operational config. One row per settings *group*, with the
+group's fields held as JSON in `value`.
+
+**Fields:**
+
+| Field | Type | Default | Constraints | Description |
+|-------|------|---------|-------------|-------------|
+| `id` | String | uuid v4 | @id, @default(uuid(4)) | Auto-generated setting identifier |
+| `key` | String | — | @unique, Required | Settings group key, e.g. `COMMERCE_CONFIG` |
+| `value` | Json | `{}` | Required (JSONB NOT NULL) | The group's fields as a JSON object |
+| `isPublic` | Boolean | false | — | Mirrors the tier for visibility in Prisma Studio (see below) |
+| `createdAt` | DateTime | now() | — | Creation timestamp |
+| `updatedAt` | DateTime | — | @updatedAt | Last update timestamp |
+
+**Required Fields for Creating a Setting:**
+```
+key, value
+```
+
+**Groups:**
+
+| key | Tier | Contents |
+|-----|------|----------|
+| `STORE_IDENTITY` | public | Legal/display name, tagline, logo, GSTIN, FSSAI, nested postal `address` |
+| `SUPPORT_CONTACT` | public | Support/sales email, phone, whatsapp, support-hours note |
+| `SOCIAL_LINKS` | public | instagram, facebook, youtube, x, linkedin |
+| `BUSINESS_HOURS` | public | IANA timezone, per-weekday open/close/closed, holiday list |
+| `COMMERCE_CONFIG` | public | Currency (code/symbol/locale), free-shipping threshold, flat rate, COD, tax, return window |
+| `NOTIFICATION_CONFIG` | private | Order-notify emails, admin whatsapp, OTP length/expiry/cooldown, low-stock threshold |
+| `INTEGRATION_CONFIG` | private | Non-secret integration wiring, analytics ids, maintenance-mode flag |
+
+**Public/private tier:**
+
+The tier is decided by which object in `src/lib/settingsDefaults.js` declares the key —
+`PUBLIC_SETTINGS` or `PRIVATE_SETTINGS`. The `isPublic` column only *mirrors* that (it is rewritten
+from code on every write) so the tier is visible when browsing the table, and it is never read to
+decide what to serve. Editing the column by hand therefore cannot move a group between tiers.
+
+**Defaults and merging:**
+
+`src/lib/settingsDefaults.js` is the single source of truth for the shape and the fallback value of
+every group, and is also what `prisma/seed.mjs` writes. At read time the stored `value` is deep-merged
+over those defaults, so:
+
+- A group with no row at all still resolves to a complete object.
+- A field added to the defaults later reaches existing rows without a data migration.
+- A `value` hand-edited to the wrong *shape* (a bare string where an object belongs) falls back to the
+  default rather than being served.
+- `__proto__`, `constructor` and `prototype` are stripped from rows and request bodies at every depth.
+
+The seed's upsert deliberately omits `value` in its `update` branch, so re-seeding or `reset-db`
+recreates missing rows but never reverts an edited store address or shipping threshold to a
+placeholder.
+
+**Validation Rules:**
+- `key`: Non-empty string; must be a known group for the API to accept writes for it
+- `value`: Must be a JSON object — not a string, number, array or null
+- `isPublic`: Never accepted from a request body; derived from the code defaults
+
+**Example:**
+```javascript
+// Read every group (the API serves this through an in-memory cache instead)
+const rows = await prisma.setting.findMany();
+
+// Read one group
+const commerce = await prisma.setting.findUnique({
+  where: { key: "COMMERCE_CONFIG" }
+});
+
+// Upsert a group — always match on `key`, not `id`: the API can create a row at runtime with a
+// generated uuid, so an id-based upsert would collide on the unique key.
+await prisma.setting.upsert({
+  where: { key: "COMMERCE_CONFIG" },
+  update: { value: mergedValue, isPublic: true },
+  create: { key: "COMMERCE_CONFIG", value: mergedValue, isPublic: true }
+});
+
+// Write several groups atomically (what PATCH /api/settings does)
+await prisma.$transaction([
+  prisma.setting.upsert({ where: { key: "SUPPORT_CONTACT" }, update: { value: a }, create: { key: "SUPPORT_CONTACT", value: a, isPublic: true } }),
+  prisma.setting.upsert({ where: { key: "COMMERCE_CONFIG" }, update: { value: b }, create: { key: "COMMERCE_CONFIG", value: b, isPublic: true } })
+]);
+```
+
+**Notes:**
+- Postgres does not validate JSON *shape*, so any `value` can be written by psql or Prisma Studio.
+  The read path is built to tolerate that (see merging, above).
+- No relations; completely self-contained.
+- Do not store secrets here — there is no HTTP auth on the settings endpoints and no encryption at
+  rest. Tokens and keys stay in `.env`.
 
 ---
 

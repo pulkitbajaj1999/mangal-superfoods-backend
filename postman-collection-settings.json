@@ -1,0 +1,1450 @@
+{
+  "info": {
+    "_postman_id": "mangal-superfoods-settings-api",
+    "name": "Mangal Superfoods API — Settings",
+    "description": "Application-level settings API for the Mangal Superfoods backend — the endpoints added in the `Setting` feature, separate from the main `postman-collection.json`.\n\n**Base URL:** `{{base_url}}` — defaults to `http://localhost:4000`. All routes are under `/api/settings`.\n\n### What this covers\n\n| Method | Path | Purpose |\n|---|---|---|\n| GET | `/api/settings` | public tier — the storefront's page-load call |\n| GET | `/api/settings/private` | private tier — the frontend's post-login call |\n| PATCH | `/api/settings` | update several groups at once, atomically |\n| PUT | `/api/settings/:key` | update a single group |\n\n### Two tiers\n\nPublic groups: `STORE_IDENTITY`, `SUPPORT_CONTACT`, `SOCIAL_LINKS`, `BUSINESS_HOURS`, `COMMERCE_CONFIG`. Private groups: `NOTIFICATION_CONFIG`, `INTEGRATION_CONFIG`.\n\nThe tier is decided by which object in `src/lib/settingsDefaults.js` declares the key. `Setting.isPublic` in the database only mirrors it and is never read to decide what to serve, so the tier cannot be changed over HTTP or by editing the column.\n\n### The cache flag\n\nReads are served from an in-memory config. Pass `?cache=false` (or `{\"cache\": false}` in a JSON body) to force a fresh read from Postgres and replace what is cached. The match is **exact** on `'false'` — `'true'`, `'0'`, a typo, a repeated param and an absent param all serve the cache, and none of them is a 400.\n\n### Authentication\n\n**None.** This repo has no session/token middleware, so every route here is unprotected — including the private tier and the writers. \"Private\" means \"not served in the anonymous storefront payload\", **not** \"access-controlled\". Don't store secrets in the `Setting` table; they belong in `.env`.\n\n### Before you run\n\n1. `npm run prisma:db:seed` — creates the 7 setting rows. (The API works with zero rows too: values fall back to the code defaults.)\n2. Restart the dev server if you just ran a migration — `src/lib/prisma.js` memoizes the client on `global.prisma`, which survives `--watch` reloads, so an old process keeps a client generated before `model Setting` existed.\n\nRun the folders in order: **Read** → **Cache Flag** → **Write** → **Validation & Guards**. The Write folder ends with a cleanup request that restores the seeded values.\n\n**Docs:** `docs/API_REFERENCE.md` (Settings section), `docs/DATABASE_SCHEMA.md` (Setting model).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Read",
+      "description": "Both read endpoints serve the in-memory config unless the request carries the cache flag, and both respond with `Cache-Control: no-store` so the in-process config stays the only cache.\n\nThe tier a group belongs to is decided by which object in `src/lib/settingsDefaults.js` declares it — `Setting.isPublic` in the database only mirrors that and is never read to decide what to serve.",
+      "item": [
+        {
+          "name": "Get Public Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns every public group, complete', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    [\"STORE_IDENTITY\", \"SUPPORT_CONTACT\", \"SOCIAL_LINKS\", \"BUSINESS_HOURS\", \"COMMERCE_CONFIG\"].forEach(function (key) {",
+                  "        pm.expect(settings, key).to.have.property(key);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('Private groups are absent', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    [\"NOTIFICATION_CONFIG\", \"INTEGRATION_CONFIG\"].forEach(function (key) {",
+                  "        pm.expect(settings[key], key).to.equal(undefined);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('meta reports the cache state', function () {",
+                  "    var meta = pm.response.json().meta;",
+                  "    pm.expect(meta.scope).to.equal('public');",
+                  "    pm.expect(meta.fromCache).to.be.a('boolean');",
+                  "    pm.expect(meta.loadedAt).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('Response is not cacheable by a proxy', function () {",
+                  "    pm.expect(pm.response.headers.get('Cache-Control')).to.include('no-store');",
+                  "});",
+                  "",
+                  "// Stash a value the write requests below will change, so they can prove a deep merge.",
+                  "pm.collectionVariables.set('seeded_support_email', pm.response.json().settings.SUPPORT_CONTACT.email);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "Fetch the public settings tier — the call the storefront makes on page load. Served from memory; no database round trip once the config is loaded.\n\nEvery known group is always present and complete, even if its database row is missing or is missing fields: values are deep-merged over the code defaults."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/settings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "settings"
+                  ]
+                },
+                "description": ""
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"settings\": {\n    \"STORE_IDENTITY\": {\n      \"legalName\": \"Mangal Superfoods Pvt. Ltd.\",\n      \"displayName\": \"Mangal Superfoods\",\n      \"tagline\": \"Pure, honest superfoods\",\n      \"description\": \"\",\n      \"logoUrl\": \"\",\n      \"faviconUrl\": \"\",\n      \"gstin\": \"\",\n      \"fssaiLicense\": \"\",\n      \"address\": {\n        \"line1\": \"\",\n        \"line2\": \"\",\n        \"landmark\": \"\",\n        \"city\": \"\",\n        \"state\": \"\",\n        \"pincode\": \"\",\n        \"country\": \"India\",\n        \"mapUrl\": \"\"\n      }\n    },\n    \"SUPPORT_CONTACT\": {\n      \"email\": \"support@mangalsuperfoods.com\",\n      \"salesEmail\": \"\",\n      \"phone\": \"\",\n      \"whatsapp\": \"\",\n      \"supportHoursNote\": \"Mon-Sat, 10:00-18:00 IST\"\n    },\n    \"SOCIAL_LINKS\": {\n      \"instagram\": \"\",\n      \"facebook\": \"\",\n      \"youtube\": \"\",\n      \"x\": \"\",\n      \"linkedin\": \"\"\n    },\n    \"BUSINESS_HOURS\": {\n      \"timezone\": \"Asia/Kolkata\",\n      \"weekly\": {\n        \"monday\": {\n          \"open\": \"09:00\",\n          \"close\": \"18:00\",\n          \"closed\": false\n        },\n        \"tuesday\": {\n          \"open\": \"09:00\",\n          \"close\": \"18:00\",\n          \"closed\": false\n        },\n        \"wednesday\": {\n          \"open\": \"09:00\",\n          \"close\": \"18:00\",\n          \"closed\": false\n        },\n        \"thursday\": {\n          \"open\": \"09:00\",\n          \"close\": \"18:00\",\n          \"closed\": false\n        },\n        \"friday\": {\n          \"open\": \"09:00\",\n          \"close\": \"18:00\",\n          \"closed\": false\n        },\n        \"saturday\": {\n          \"open\": \"10:00\",\n          \"close\": \"16:00\",\n          \"closed\": false\n        },\n        \"sunday\": {\n          \"open\": \"\",\n          \"close\": \"\",\n          \"closed\": true\n        }\n      },\n      \"holidays\": []\n    },\n    \"COMMERCE_CONFIG\": {\n      \"currency\": {\n        \"code\": \"INR\",\n        \"symbol\": \"₹\",\n        \"locale\": \"en-IN\"\n      },\n      \"freeShippingThreshold\": 999,\n      \"shippingFlatRate\": 49,\n      \"minOrderValue\": 0,\n      \"maxCartQuantityPerItem\": 10,\n      \"codEnabled\": true,\n      \"codFee\": 0,\n      \"tax\": {\n        \"pricesIncludeTax\": true,\n        \"gstPercent\": 5\n      },\n      \"returnWindowDays\": 7\n    }\n  },\n  \"meta\": {\n    \"scope\": \"public\",\n    \"fromCache\": true,\n    \"loadedAt\": \"2026-08-11T20:08:19.139Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Public Settings (force fresh read)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Went to the database', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(false);",
+                  "});",
+                  "",
+                  "// Keep the timestamp so the next request can prove the refresh replaced the config.",
+                  "pm.collectionVariables.set('last_loaded_at', pm.response.json().meta.loadedAt);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=false",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "false",
+                  "description": "Only the exact string 'false' forces a database read."
+                }
+              ]
+            },
+            "description": "`?cache=false` bypasses the in-memory config, reads Postgres, and replaces what is cached — so every later request without the flag sees the fresh values too.\n\nThe cache flag is matched **exactly**: only the string `'false'` (or boolean `false` in a JSON body) forces a database read. Query params are always strings, so `Boolean('false')` would be `true` — hence the exact match. Anything unrecognised is discarded and the loaded config is served, rather than returning a 400."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/settings?cache=false",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "settings"
+                  ]
+                },
+                "description": ""
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"settings\": {\n    \"SUPPORT_CONTACT\": {\n      \"email\": \"support@mangalsuperfoods.com\",\n      \"salesEmail\": \"\",\n      \"phone\": \"\",\n      \"whatsapp\": \"\",\n      \"supportHoursNote\": \"Mon-Sat, 10:00-18:00 IST\"\n    }\n  },\n  \"meta\": {\n    \"scope\": \"public\",\n    \"fromCache\": false,\n    \"loadedAt\": \"2026-08-11T20:08:31.402Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Public Settings (served from cache)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Served from memory, no database read', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(true);",
+                  "});",
+                  "",
+                  "pm.test('Same snapshot the forced refresh loaded', function () {",
+                  "    var expected = pm.collectionVariables.get('last_loaded_at');",
+                  "    if (expected) {",
+                  "        pm.expect(pm.response.json().meta.loadedAt).to.equal(expected);",
+                  "    } else {",
+                  "        pm.expect.fail('Run \"Get Public Settings (force fresh read)\" first');",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "Run this straight after the forced refresh. `loadedAt` is unchanged, which proves the refresh replaced the stored config and this response came out of memory rather than Postgres."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Private Settings (after login)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Returns every private group', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    [\"NOTIFICATION_CONFIG\", \"INTEGRATION_CONFIG\"].forEach(function (key) {",
+                  "        pm.expect(settings, key).to.have.property(key);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('Public groups are not repeated here', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    [\"STORE_IDENTITY\", \"SUPPORT_CONTACT\", \"SOCIAL_LINKS\", \"BUSINESS_HOURS\", \"COMMERCE_CONFIG\"].forEach(function (key) {",
+                  "        pm.expect(settings[key], key).to.equal(undefined);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('meta scope is private', function () {",
+                  "    pm.expect(pm.response.json().meta.scope).to.equal('private');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings/private?cache=false",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings",
+                "private"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "false",
+                  "description": "Refresh the server config as part of the post-login fetch."
+                }
+              ]
+            },
+            "description": "Fetch the private settings tier. The frontend calls this immediately after a successful login, with `?cache=false` so it gets the private groups **and** refreshes the server's config in one round trip; it then merges the response into the public config it already holds.\n\n⚠️ **There is no authentication on this route.** This repo has no session middleware and no `request.user` — \"private\" means \"not served in the anonymous storefront payload\", not \"access-controlled\". The tiers sit on separate paths so a single `router.use(requireAdmin)` can gate this route and the writers when auth lands (there is a `// TODO` marking the spot in `src/routes/settings.js`). Never put secrets in the `Setting` table — they belong in `.env`."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/settings/private?cache=false",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "settings",
+                    "private"
+                  ]
+                },
+                "description": ""
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"settings\": {\n    \"NOTIFICATION_CONFIG\": {\n      \"orderNotifyEmails\": [],\n      \"adminWhatsapp\": \"\",\n      \"otp\": {\n        \"length\": 4,\n        \"expiryMinutes\": 5,\n        \"resendCooldownSeconds\": 60\n      },\n      \"lowStockThreshold\": 5\n    },\n    \"INTEGRATION_CONFIG\": {\n      \"whapi\": {\n        \"enabled\": true,\n        \"senderLabel\": \"Mangal Superfoods\"\n      },\n      \"analytics\": {\n        \"gaMeasurementId\": \"\",\n        \"metaPixelId\": \"\"\n      },\n      \"maintenance\": {\n        \"enabled\": false,\n        \"message\": \"\"\n      }\n    }\n  },\n  \"meta\": {\n    \"scope\": \"private\",\n    \"fromCache\": false,\n    \"loadedAt\": \"2026-08-11T20:08:19.139Z\"\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cache Flag",
+      "description": "Every one of these returns **200**. An unrecognised flag is discarded rather than rejected, so a typo degrades to \"served from cache\" instead of failing the storefront's page load.\n\nRun **Get Public Settings** once first so there is something cached to serve.",
+      "item": [
+        {
+          "name": "cache=false → reads the database",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 (an unusable flag is never a 400)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('fromCache is false', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=false",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "The only query value that forces a database read.\n\nThe cache flag is matched **exactly**: only the string `'false'` (or boolean `false` in a JSON body) forces a database read. Query params are always strings, so `Boolean('false')` would be `true` — hence the exact match. Anything unrecognised is discarded and the loaded config is served, rather than returning a 400."
+          },
+          "response": []
+        },
+        {
+          "name": "cache=true → serves the cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 (an unusable flag is never a 400)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('fromCache is true', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Explicitly asking for the cache, which is also the default.\n\nThe cache flag is matched **exactly**: only the string `'false'` (or boolean `false` in a JSON body) forces a database read. Query params are always strings, so `Boolean('false')` would be `true` — hence the exact match. Anything unrecognised is discarded and the loaded config is served, rather than returning a 400."
+          },
+          "response": []
+        },
+        {
+          "name": "cache=fasle (typo) → serves the cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 (an unusable flag is never a 400)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('fromCache is true', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=fasle",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "fasle"
+                }
+              ]
+            },
+            "description": "A misspelled flag is discarded. This is the case a naive `Boolean(req.query.cache)` would get wrong in the other direction — and silently serving stale data because of a typo is far harder to debug than a value that is simply ignored.\n\nThe cache flag is matched **exactly**: only the string `'false'` (or boolean `false` in a JSON body) forces a database read. Query params are always strings, so `Boolean('false')` would be `true` — hence the exact match. Anything unrecognised is discarded and the loaded config is served, rather than returning a 400."
+          },
+          "response": []
+        },
+        {
+          "name": "cache=0 → serves the cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 (an unusable flag is never a 400)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('fromCache is true', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=0",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "`'0'` is *not* an accepted spelling of false. The match is exact on `'false'` so there is exactly one way to express the intent.\n\nThe cache flag is matched **exactly**: only the string `'false'` (or boolean `false` in a JSON body) forces a database read. Query params are always strings, so `Boolean('false')` would be `true` — hence the exact match. Anything unrecognised is discarded and the loaded config is served, rather than returning a 400."
+          },
+          "response": []
+        },
+        {
+          "name": "cache=false&cache=true (repeated) → serves the cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('A repeated param is discarded, not guessed at', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=false&cache=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "false"
+                },
+                {
+                  "key": "cache",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Express parses a repeated query param into an **array**, not a string, so it fails the exact match and is discarded. No arbitrary \"last one wins\" behaviour."
+          },
+          "response": []
+        },
+        {
+          "name": "cache flag in the JSON body",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Body flag forced a database read', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(false);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cache\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "The flag is also read from a JSON body, where boolean `false` is accepted alongside the string.\n\n**Caveat:** the query string is the primary channel because `fetch(url, { method: 'GET', body })` throws in browsers and in Bun, and proxies are entitled to drop GET bodies. Postman and curl will send it, so this request works — but prefer `?cache=false` from application code."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Write",
+      "description": "`PATCH /api/settings` is the primary writer: an admin screen edits several groups in one Save, and doing that as N sequential `PUT`s would mean N round trips, N cache refreshes, and a half-applied state if the third one failed. All groups go in one `prisma.$transaction`, and the config is refreshed once afterwards.\n\n`PUT /api/settings/:key` is the single-group convenience form over the same code path.\n\nBoth **deep-merge**: nested objects merge key by key, while arrays and scalars replace wholesale (an element-wise array merge would mean removing the 2nd of 3 holidays leaves the 3rd behind). Run **Restore Seeded Values** at the end to leave the database as you found it.",
+      "item": [
+        {
+          "name": "Update Several Groups (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('All three groups were written', function () {",
+                  "    pm.expect(pm.response.json().meta.updated).to.equal(3);",
+                  "});",
+                  "",
+                  "pm.test('Patched fields took effect', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    pm.expect(settings.SUPPORT_CONTACT.phone).to.equal('9876543210');",
+                  "    pm.expect(settings.COMMERCE_CONFIG.freeShippingThreshold).to.equal(1499);",
+                  "    pm.expect(settings.COMMERCE_CONFIG.currency.symbol).to.equal('Rs.');",
+                  "    pm.expect(settings.NOTIFICATION_CONFIG.lowStockThreshold).to.equal(3);",
+                  "});",
+                  "",
+                  "pm.test('Deep merge kept the siblings it was not asked to change', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    // currency.symbol changed; code and locale must survive",
+                  "    pm.expect(settings.COMMERCE_CONFIG.currency.code).to.equal('INR');",
+                  "    pm.expect(settings.COMMERCE_CONFIG.currency.locale).to.equal('en-IN');",
+                  "    // untouched fields in the same group survive",
+                  "    pm.expect(settings.COMMERCE_CONFIG.tax.gstPercent).to.equal(5);",
+                  "    pm.expect(settings.COMMERCE_CONFIG.codEnabled).to.equal(true);",
+                  "    // untouched fields in a patched group survive",
+                  "    pm.expect(settings.NOTIFICATION_CONFIG.otp.expiryMinutes).to.equal(5);",
+                  "    var seededEmail = pm.collectionVariables.get('seeded_support_email');",
+                  "    if (seededEmail) {",
+                  "        pm.expect(settings.SUPPORT_CONTACT.email).to.equal(seededEmail);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('Response echoes only the groups that were touched', function () {",
+                  "    var keys = Object.keys(pm.response.json().settings);",
+                  "    pm.expect(keys).to.have.lengthOf(3);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settings\": {\n    \"SUPPORT_CONTACT\": {\n      \"phone\": \"9876543210\"\n    },\n    \"COMMERCE_CONFIG\": {\n      \"freeShippingThreshold\": 1499,\n      \"currency\": {\n        \"symbol\": \"Rs.\"\n      }\n    },\n    \"NOTIFICATION_CONFIG\": {\n      \"lowStockThreshold\": 3\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "Update several groups at once — note the batch spans **both tiers** (`SUPPORT_CONTACT` is public, `NOTIFICATION_CONFIG` is private).\n\nEach value is deep-merged into what is stored, so `{\"currency\": {\"symbol\": \"Rs.\"}}` changes the symbol and leaves `code` and `locale` alone. The response echoes the **effective** (merged) value of each group it touched.\n\n`isPublic` in the body is ignored: the tier comes from the code defaults, which is what makes it untamperable over HTTP."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"settings\": {\n    \"SUPPORT_CONTACT\": {\n      \"phone\": \"9876543210\"\n    },\n    \"COMMERCE_CONFIG\": {\n      \"freeShippingThreshold\": 1499,\n      \"currency\": {\n        \"symbol\": \"Rs.\"\n      }\n    },\n    \"NOTIFICATION_CONFIG\": {\n      \"lowStockThreshold\": 3\n    }\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/settings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "settings"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"settings\": {\n    \"SUPPORT_CONTACT\": {\n      \"email\": \"support@mangalsuperfoods.com\",\n      \"salesEmail\": \"\",\n      \"phone\": \"9876543210\",\n      \"whatsapp\": \"\",\n      \"supportHoursNote\": \"Mon-Sat, 10:00-18:00 IST\"\n    },\n    \"COMMERCE_CONFIG\": {\n      \"currency\": {\n        \"code\": \"INR\",\n        \"symbol\": \"Rs.\",\n        \"locale\": \"en-IN\"\n      },\n      \"freeShippingThreshold\": 1499,\n      \"shippingFlatRate\": 49,\n      \"minOrderValue\": 0,\n      \"maxCartQuantityPerItem\": 10,\n      \"codEnabled\": true,\n      \"codFee\": 0,\n      \"tax\": {\n        \"pricesIncludeTax\": true,\n        \"gstPercent\": 5\n      },\n      \"returnWindowDays\": 7\n    },\n    \"NOTIFICATION_CONFIG\": {\n      \"orderNotifyEmails\": [],\n      \"adminWhatsapp\": \"\",\n      \"otp\": {\n        \"length\": 4,\n        \"expiryMinutes\": 5,\n        \"resendCooldownSeconds\": 60\n      },\n      \"lowStockThreshold\": 3\n    }\n  },\n  \"meta\": {\n    \"updated\": 3,\n    \"loadedAt\": \"2026-08-11T20:08:50.383Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify the Write Reached the Cache",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Served from cache — the write refreshed it, no flag needed', function () {",
+                  "    pm.expect(pm.response.json().meta.fromCache).to.equal(true);",
+                  "});",
+                  "",
+                  "pm.test('Cached config already reflects the PATCH', function () {",
+                  "    var commerce = pm.response.json().settings.COMMERCE_CONFIG;",
+                  "    pm.expect(commerce.freeShippingThreshold).to.equal(1499);",
+                  "    pm.expect(commerce.currency.symbol).to.equal('Rs.');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "A plain cached read straight after the PATCH. It already shows the new values because the write refreshed the store — no `?cache=false` required.\n\n**Caveat:** the config is per-process. A write refreshes only the instance that served it; another instance behind a load balancer, or a row edited in Prisma Studio, would stay stale until someone passes the cache flag."
+          },
+          "response": []
+        },
+        {
+          "name": "Update a Single Group (PUT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('One group was written', function () {",
+                  "    pm.expect(pm.response.json().meta.updated).to.equal(1);",
+                  "});",
+                  "",
+                  "pm.test('Nested merge changed only the named leaf', function () {",
+                  "    var commerce = pm.response.json().settings[pm.collectionVariables.get('setting_key')];",
+                  "    pm.expect(commerce.tax.gstPercent).to.equal(12);",
+                  "    pm.expect(commerce.tax.pricesIncludeTax).to.equal(true);",
+                  "    pm.expect(commerce.returnWindowDays).to.equal(14);",
+                  "    // set by the PATCH above and not named here, so it must survive",
+                  "    pm.expect(commerce.freeShippingThreshold).to.equal(1499);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": {\n    \"tax\": {\n      \"gstPercent\": 12\n    },\n    \"returnWindowDays\": 14\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings/{{setting_key}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings",
+                "{{setting_key}}"
+              ]
+            },
+            "description": "Single-group form, identical merge and validation behaviour to `PATCH /api/settings`. Reads better from curl and suits a one-field admin toggle.\n\n`{{setting_key}}` defaults to `COMMERCE_CONFIG`. A field sent as `null` falls back to the code default rather than storing null, which is what guarantees callers never receive a null effective value."
+          },
+          "response": [
+            {
+              "name": "OK",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"value\": {\n    \"tax\": {\n      \"gstPercent\": 12\n    },\n    \"returnWindowDays\": 14\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/settings/{{setting_key}}",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "settings",
+                    "{{setting_key}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"settings\": {\n    \"COMMERCE_CONFIG\": {\n      \"currency\": {\n        \"code\": \"INR\",\n        \"symbol\": \"Rs.\",\n        \"locale\": \"en-IN\"\n      },\n      \"freeShippingThreshold\": 1499,\n      \"shippingFlatRate\": 49,\n      \"minOrderValue\": 0,\n      \"maxCartQuantityPerItem\": 10,\n      \"codEnabled\": true,\n      \"codFee\": 0,\n      \"tax\": {\n        \"pricesIncludeTax\": true,\n        \"gstPercent\": 12\n      },\n      \"returnWindowDays\": 14\n    }\n  },\n  \"meta\": {\n    \"updated\": 1,\n    \"loadedAt\": \"2026-08-11T20:08:50.305Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Restore Seeded Values (cleanup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Everything the folder changed is back to its seeded value', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    pm.expect(settings.SUPPORT_CONTACT.phone).to.equal('');",
+                  "    pm.expect(settings.COMMERCE_CONFIG.freeShippingThreshold).to.equal(999);",
+                  "    pm.expect(settings.COMMERCE_CONFIG.currency.symbol).to.equal('₹');",
+                  "    pm.expect(settings.COMMERCE_CONFIG.tax.gstPercent).to.equal(5);",
+                  "    pm.expect(settings.COMMERCE_CONFIG.returnWindowDays).to.equal(7);",
+                  "    pm.expect(settings.NOTIFICATION_CONFIG.lowStockThreshold).to.equal(5);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settings\": {\n    \"SUPPORT_CONTACT\": {\n      \"phone\": \"\"\n    },\n    \"COMMERCE_CONFIG\": {\n      \"freeShippingThreshold\": 999,\n      \"currency\": {\n        \"symbol\": \"₹\"\n      },\n      \"tax\": {\n        \"gstPercent\": 5\n      },\n      \"returnWindowDays\": 7\n    },\n    \"NOTIFICATION_CONFIG\": {\n      \"lowStockThreshold\": 5\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "Puts every field this folder changed back to its seeded default, so the folder is re-runnable.\n\nNote `prisma:db:seed` will **not** do this for you: the seed's upsert deliberately omits `value` in its `update` branch, precisely so re-seeding cannot revert a real store address or shipping threshold to a placeholder. To reset the rows wholesale instead: `DELETE FROM \"Setting\";` then `npm run prisma:db:seed`."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Validation & Guards",
+      "description": "There is no validation library in this repo, so validation is hand-rolled: a plain-object check, a known-key check, and key sanitisation. These requests cover each rejection path plus the two guards that matter — the tier cannot be promoted over HTTP, and a `__proto__` payload cannot pollute the process.",
+      "item": [
+        {
+          "name": "PATCH with an unknown key → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Every offending key is named at once', function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.error).to.equal('Unknown settings keys');",
+                  "    pm.expect(body.keys).to.include('NOPE');",
+                  "    pm.expect(body.keys).to.include('ALSO_NOPE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settings\": {\n    \"NOPE\": {},\n    \"ALSO_NOPE\": {}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "Unknown groups are rejected, and **all** of them are listed in one response. Rejecting one key at a time would make a caller fix a batch by trial and error."
+          },
+          "response": [
+            {
+              "name": "Bad Request",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"settings\": {\n    \"NOPE\": {}\n  }\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/settings",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "settings"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": \"Unknown settings keys\",\n  \"keys\": [\n    \"NOPE\",\n    \"ALSO_NOPE\"\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "PATCH is all-or-nothing → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Rejected on the bad key', function () {",
+                  "    pm.expect(pm.response.json().keys).to.include('NOPE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settings\": {\n    \"SUPPORT_CONTACT\": {\n      \"email\": \"leaked@example.com\"\n    },\n    \"NOPE\": {}\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "A batch mixing one valid entry with one unknown key. Every entry is validated **before** anything is written, so the valid half is not applied either — a partial apply is worse than a clean rejection. The next request proves it.\n\nBeyond validation, the writes themselves run in one `prisma.$transaction`, so a failure part-way through the database work also leaves nothing applied."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify the Rejected Batch Wrote Nothing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('The valid half of the rejected batch was NOT applied', function () {",
+                  "    pm.expect(pm.response.json().settings.SUPPORT_CONTACT.email).to.not.equal('leaked@example.com');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=false",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Read straight from Postgres (bypassing the cache, so this cannot be a stale-cache false negative) and confirm the `SUPPORT_CONTACT.email` from the rejected batch never landed."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH with a non-object value → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Names the groups whose values were not objects', function () {",
+                  "    var body = pm.response.json();",
+                  "    pm.expect(body.error).to.equal('Each settings value must be a JSON object');",
+                  "    pm.expect(body.keys).to.include('SOCIAL_LINKS');",
+                  "    pm.expect(body.keys).to.include('BUSINESS_HOURS');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settings\": {\n    \"SOCIAL_LINKS\": \"nope\",\n    \"BUSINESS_HOURS\": [\n      1,\n      2\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "Each value must be a JSON **object**. Note both arrays and `null` are `typeof 'object'` in JavaScript, so the guard has to exclude them explicitly — which it does."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH with an empty settings map → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Uses the repo-standard message', function () {",
+                  "    pm.expect(pm.response.json().error).to.equal('Missing required fields');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"settings\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ]
+            },
+            "description": "`settings` must be present and non-empty. Same message for a missing `settings` key."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT an unknown group → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Says the key is unknown', function () {",
+                  "    pm.expect(pm.response.json().error).to.equal('Unknown settings key');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings/NOPE",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings",
+                "NOPE"
+              ]
+            },
+            "description": "The single-group route returns **404** for an unknown key (it is addressing one resource by path), whereas the batch route returns 400 with the offending keys listed."
+          },
+          "response": [
+            {
+              "name": "Not Found",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"value\": {}\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/settings/NOPE",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "settings",
+                    "NOPE"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": \"Unknown settings key\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "PUT with a non-object value → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Uses the repo-standard message', function () {",
+                  "    pm.expect(pm.response.json().error).to.equal('Missing required fields');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": \"nope\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings/SUPPORT_CONTACT",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings",
+                "SUPPORT_CONTACT"
+              ]
+            },
+            "description": "`value` must be a JSON object. Try `\"value\": null` and `\"value\": [1,2]` too — both are also 400, because `isPlainObject` excludes null and arrays."
+          },
+          "response": []
+        },
+        {
+          "name": "Attempt to Promote a Private Group → ignored",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200 — the write itself succeeds', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('isPublic is not echoed as a settable field', function () {",
+                  "    pm.expect(pm.response.json()).to.not.have.property('isPublic');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": {},\n  \"isPublic\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings/INTEGRATION_CONFIG",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings",
+                "INTEGRATION_CONFIG"
+              ]
+            },
+            "description": "Sends `isPublic: true` for a **private** group. The write succeeds (the empty `value` changes nothing) but the flag is ignored: `isPublic` is always derived from which defaults object holds the key, never read from the request.\n\nThe database column is only a mirror for readability — the code decides the tier — so there is no way to promote a private group over HTTP, and even editing the column by hand in psql would not do it. The next request confirms."
+          },
+          "response": []
+        },
+        {
+          "name": "Verify the Private Group Is Still Hidden",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Private groups are still absent from the public payload', function () {",
+                  "    var settings = pm.response.json().settings;",
+                  "    pm.expect(settings.INTEGRATION_CONFIG).to.equal(undefined);",
+                  "    pm.expect(settings.NOTIFICATION_CONFIG).to.equal(undefined);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/settings?cache=false",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings"
+              ],
+              "query": [
+                {
+                  "key": "cache",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": "Read fresh from Postgres and confirm the promotion attempt did not put a private group into the public tier."
+          },
+          "response": []
+        },
+        {
+          "name": "Prototype Pollution Attempt → stripped",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('The legitimate field was saved', function () {",
+                  "    pm.expect(pm.response.json().settings.SUPPORT_CONTACT.salesEmail).to.equal('sales@mangalsuperfoods.com');",
+                  "});",
+                  "",
+                  "pm.test('No __proto__ key survived into the stored group', function () {",
+                  "    var group = pm.response.json().settings.SUPPORT_CONTACT;",
+                  "    pm.expect(Object.keys(group)).to.not.include('__proto__');",
+                  "    pm.expect(Object.keys(group)).to.not.include('constructor');",
+                  "});",
+                  "",
+                  "pm.test('Nothing was grafted onto Object.prototype', function () {",
+                  "    pm.expect(({}).polluted).to.equal(undefined);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"value\": {\n    \"salesEmail\": \"sales@mangalsuperfoods.com\",\n    \"__proto__\": { \"polluted\": true },\n    \"nested\": { \"constructor\": { \"x\": 1 } }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/settings/SUPPORT_CONTACT",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "settings",
+                "SUPPORT_CONTACT"
+              ]
+            },
+            "description": "`JSON.parse('{\"__proto__\":{...}}')` produces an *own, enumerable* `__proto__` key that `Object.keys()` returns, and `express.json()` does not strip it. Anything that then walks the object and assigns into `target[key]` writes straight into `Object.prototype` and pollutes every object in the process.\n\n`sanitizeKeys` removes `__proto__`, `constructor` and `prototype` at every depth from both request bodies and database rows, so the key never reaches the merge and is never persisted. The legitimate `salesEmail` in the same payload is saved normally.\n\nRun **Restore Seeded Values** in the Write folder afterwards to clear `salesEmail`."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000",
+      "type": "string",
+      "description": "Backend origin. Settings routes live under /api/settings."
+    },
+    {
+      "key": "setting_key",
+      "value": "COMMERCE_CONFIG",
+      "type": "string",
+      "description": "Group key used by the single-group PUT request. One of STORE_IDENTITY, SUPPORT_CONTACT, SOCIAL_LINKS, BUSINESS_HOURS, COMMERCE_CONFIG (public), NOTIFICATION_CONFIG, INTEGRATION_CONFIG (private)."
+    },
+    {
+      "key": "private_setting_key",
+      "value": "NOTIFICATION_CONFIG",
+      "type": "string",
+      "description": "A private group key, for trying the tier guard against a group of your choosing."
+    },
+    {
+      "key": "seeded_support_email",
+      "value": "support@mangalsuperfoods.com",
+      "type": "string",
+      "description": "Captured by 'Get Public Settings' so the write requests can prove a deep merge kept it."
+    },
+    {
+      "key": "last_loaded_at",
+      "value": "",
+      "type": "string",
+      "description": "Captured by the forced-refresh request so the next read can prove it hit the cache."
+    }
+  ]
+}

@@ -4,6 +4,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import { scryptSync, randomBytes } from 'crypto';
 
+import { PUBLIC_SETTINGS, PRIVATE_SETTINGS } from '../src/lib/settingsDefaults.js';
+
 const { PrismaClient } = pkg;
 
 const connectionString = process.env.DATABASE_URL;
@@ -87,6 +89,16 @@ const ID = {
     login: 'c7f69a35-2646-4697-a0f0-fb8398d1ee5e',
     signup: '84e8047d-e656-4be2-ae6b-9e04eb33c701',
     reset: 'af1790cb-520d-4fbb-970a-79bce959bfa7',
+  },
+  // Keyed by the settings group key itself (see src/lib/settingsDefaults.js).
+  settings: {
+    STORE_IDENTITY: '39ab0c17-1cb3-4e6a-9401-7733eebcaa45',
+    SUPPORT_CONTACT: 'e1c39284-2205-4957-961b-490473a5cbdb',
+    SOCIAL_LINKS: '831f726b-d978-4b07-9f49-75dc1b0a917f',
+    BUSINESS_HOURS: 'd1baa072-8b7e-4ef8-9f65-03cda471d602',
+    COMMERCE_CONFIG: '2da7d049-4edf-4980-ba12-4e4c5cf8c396',
+    NOTIFICATION_CONFIG: 'e0bebef5-3974-4bdb-9e41-38099d142f15',
+    INTEGRATION_CONFIG: '80528db3-2227-4f7a-ae64-2e24934c981f',
   },
 };
 
@@ -664,6 +676,24 @@ async function main() {
     },
   ];
 
+  // Application settings. The values come straight from src/lib/settingsDefaults.js so the seeded
+  // rows and the runtime fallbacks cannot drift — add fields there, not here. Which defaults object
+  // a group lives in is what makes it public or private.
+  const settings = [
+    ...Object.entries(PUBLIC_SETTINGS).map(([key, value]) => ({
+      id: ID.settings[key],
+      key,
+      value,
+      isPublic: true,
+    })),
+    ...Object.entries(PRIVATE_SETTINGS).map(([key, value]) => ({
+      id: ID.settings[key],
+      key,
+      value,
+      isPublic: false,
+    })),
+  ];
+
   // --- Upserts ---
   for (const u of users) {
     const hashedPassword = u.password ? hashPassword(u.password) : null;
@@ -808,6 +838,24 @@ async function main() {
         body: template.body,
       },
       create: template,
+    });
+  }
+
+  for (const s of settings) {
+    // Match on `key`, not `id`, for the same reason as otpTemplates above: PATCH /api/settings and
+    // PUT /api/settings/:key can create a row at runtime with a generated uuid, so an id-based
+    // upsert would collide on the unique `key`.
+    //
+    // `update` deliberately omits `value`: re-seeding must not revert a real store address, phone
+    // number or shipping threshold back to these placeholders, and `reset-db`/`prisma:db:seed` are
+    // in the daily loop. Fields added to settingsDefaults.js later still reach an existing row,
+    // because reads deep-merge the row over the defaults.
+    await prisma.setting.upsert({
+      where: { key: s.key },
+      update: {
+        isPublic: s.isPublic,
+      },
+      create: s,
     });
   }
 

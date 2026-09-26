@@ -19,7 +19,7 @@ npm run start                  # run the API without --watch
 npm run prisma:generate        # regenerate the Prisma client
 npm run prisma:migrate:dev     # create/apply a dev migration
 npm run prisma:migrate:deploy  # apply migrations in production
-npm run prisma:migrate:reset   # DESTRUCTIVE: drop + re-migrate the dev DB, then reseed it
+npm run reset-db               # DESTRUCTIVE: drop + re-migrate the dev DB, then reseed it
 npm run prisma:studio          # open Prisma Studio
 npm run prisma:db:push         # push schema changes without a migration
 npm run prisma:db:pull         # introspect the DB into the schema
@@ -69,6 +69,26 @@ endpoints locally.
     generates a 4-digit OTP, persists it to `OtpCode` with a 5-minute expiry, and posts the templated
     message (`OtpTemplate`, auto-created on first use) to the whapi.cloud API. `/verify` checks for a
     matching, unused, unexpired `OtpCode` and marks it used.
+  - `settings.js` — application-level settings. GET `/` (public tier), GET `/private` (private tier,
+    called by the frontend after login), PATCH `/` (update several groups at once, in one
+    `prisma.$transaction`), PUT `/:key` (single group — a thin wrapper over the same helper). Reads are
+    served from the in-memory `SettingsStore` unless the request carries the cache flag; every write
+    refreshes the store. The `useCache` helper matches `'false'` **exactly** and discards anything else
+    (query params are strings, so `Boolean('false')` is true), so `?cache=maybe` means cached, not a 400.
+- `src/lib/settingsDefaults.js` — `PUBLIC_SETTINGS` / `PRIVATE_SETTINGS`: the shape, the fallback value
+  and the seed payload for every settings group, in one place. Which of the two objects holds a key *is*
+  its public/private categorisation; `Setting.isPublic` in the database only mirrors that and is never
+  what decides the tier at read time. This module must import nothing and read no `process.env` —
+  `prisma/seed.mjs` imports it, and pulling in `src/lib/prisma.js` transitively would open a second
+  `pg.Pool` in the seed process. No default may be `null`.
+- `src/lib/settings.js` — the `SettingsStore` singleton plus `sanitizeKeys` and `deepMerge`. A read with
+  the cache flag unset returns the already-loaded config without touching the database; if nothing is
+  loaded, one query is issued and concurrent requests await that same promise. `deepMerge` lets the
+  stored value win but falls back to the default on a *shape* mismatch, so a `value` column hand-edited
+  to a bare string is not served where an object is expected. `sanitizeKeys` strips
+  `__proto__`/`constructor`/`prototype` from both request bodies and database rows at the boundary, so
+  nothing downstream has to guard against prototype pollution. Deliberately *not* memoized on `global`
+  (unlike `prisma.js`): surviving a `--watch` reload would make edits to `settingsDefaults.js` invisible.
 - `src/lib/prisma.js` — the shared Prisma client. Uses the `driverAdapters` preview feature
   (`@prisma/adapter-pg` over a `pg.Pool`) rather than Prisma's built-in connection handling, and is
   memoized on `global.prisma` outside of `NODE_ENV=production` to survive `--watch` reloads. Always
@@ -76,13 +96,15 @@ endpoints locally.
 - `src/lib/s3.js` — `S3Client` configured with `forcePathStyle: true` for LocalStack/Backblaze
   B2-compatible endpoints; exports `s3Client` and `BUCKET_NAME`.
 - `prisma/schema.prisma` — models: `User` (roles: `CUSTOMER`/`ADMIN`/`SELLER`, cart stored as `Json`),
-  `Product`, `Order`/`OrderItem`, `Rating`, `Address`, `Coupon`, `OtpTemplate`, `OtpCode`. No `Store`
+  `Product`, `Order`/`OrderItem`, `Rating`, `Address`, `Coupon`, `Setting`, `OtpTemplate`, `OtpCode`. No `Store`
   model — this is a single-vendor store. Each model has a `// Required for creating a <Model>: ...`
   comment listing the fields a create call must supply — keep these comments in sync when changing
   required fields.
 - `prisma/seed.mjs` — standalone seed script (own `PrismaClient`/adapter setup, not `src/lib/prisma.js`).
-  All seed data is inlined in this file as plain literals — there is **no** external fixture file to
-  import, so seed content is changed here and nowhere else. (It was originally transcribed by hand from
+  All seed data is inlined in this file as plain literals — with one exception, `Setting` rows, whose
+  values are imported from `src/lib/settingsDefaults.js` so the seed and the runtime fallbacks cannot
+  drift. That loop's `update` deliberately omits `value`, so re-seeding will not revert a real store
+  address or shipping threshold to a placeholder. (It was originally transcribed by hand from
   `mockdata/dummy_data.js`, a copy of the frontend's `assets/assets.js`; that file has been deleted and
   some comments in `seed.mjs` still name its exports.) The script rewrites bare image keys
   (`techitems/product_img4.png`) to full S3 URLs (`toS3Url`) before writing `Product` rows, using
@@ -95,13 +117,27 @@ endpoints locally.
 - `prisma.config.js` — Prisma 7 config: datasource URL from `DATABASE_URL` plus `migrations.seed`
   (`bun prisma/seed.mjs`). Prisma 7 only runs that hook from `prisma db seed`; unlike v6, `migrate reset`
   does not seed on its own (there's no `--skip-seed` flag anymore), which is why the
-  `prisma:migrate:reset` script chains `&& prisma db seed`.
+  `reset-db` script chains `&& prisma db seed`.
 
 ## Notable conventions / gaps to be aware of
 
 - There is no authentication/session middleware — routes are unprotected at the HTTP layer, matching the
   previous Next.js API routes' behavior. Role checks (e.g. admin-only actions) are enforced client-side
   in the frontend only, not here. Don't assume a `request.user` or similar exists.
+  - This is why the "private" settings tier is **not** access-controlled: `GET /api/settings/private`,
+    `PATCH /api/settings` and `PUT /api/settings/:key` are reachable by anyone who can reach the port.
+    "Private" only means "not in the anonymous storefront payload". The tiers sit on separate paths so
+    the fix is a single `router.use(requireAdmin)` in `src/routes/settings.js` — there's a `// TODO`
+    marking the spot. Don't put secrets in the `Setting` table; they stay in `.env`.
+- The settings config is cached **per process**, with no TTL. A write refreshes only the instance that
+  served it, and a row changed by Prisma Studio, psql or a reseed invalidates nothing — `?cache=false`
+  is the only refresh lever. Fine for a single instance; if this ever runs behind a load balancer, the
+  intended follow-up is Postgres `LISTEN/NOTIFY` (no new dependencies — the app already owns a `pg.Pool`).
+  Note also that `bun --watch` reloads reset the store on every save, so staleness is invisible in dev.
+- Adding a Prisma model does not reach an already-running `bun --watch` dev server: `src/lib/prisma.js`
+  memoizes the client on `global.prisma`, which survives reloads, so the process keeps the client
+  generated before the model existed and every query on it fails. Restart the dev server after
+  `prisma migrate dev` / `prisma generate`.
 - IDs are uuid v4 strings generated by Prisma (`@default(uuid(4))`) — including `User.id`, which
   `POST /api/users` still accepts from the caller but no longer requires. `Coupon.code` is the one
   exception: it's its own primary key. Don't assume integer/auto-increment IDs anywhere.

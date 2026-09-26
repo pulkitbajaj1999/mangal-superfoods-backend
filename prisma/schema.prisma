@@ -149,6 +149,21 @@ model Coupon {
   createdAt   DateTime @default(now())
 }
 
+// Required for creating a Setting: key, value (JSON); isPublic defaults to false (private)
+//
+// One row per settings *group* (see src/lib/settingsDefaults.js), the group's fields held as JSON in
+// `value`. `isPublic` mirrors the tier so it is visible in Prisma Studio and is written from code on
+// every write — it is never what decides the tier at read time (which of the two default objects
+// holds the key does), so editing this column by hand cannot move a group between tiers.
+model Setting {
+  id        String   @id @default(uuid(4))
+  key       String   @unique
+  value     Json     @default("{}")
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model OtpTemplate {
   id        String   @id @default(uuid(4))
   key       String   @unique

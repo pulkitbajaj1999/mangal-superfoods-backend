@@ -15,8 +15,9 @@ Complete endpoint documentation for the Mangal Superfoods backend API. All endpo
 6. [Ratings](#ratings)
 7. [Coupons](#coupons)
 8. [SMS / OTP](#sms--otp)
-9. [Health Check](#health-check)
-10. [Common Patterns](#common-patterns)
+9. [Settings](#settings)
+10. [Health Check](#health-check)
+11. [Common Patterns](#common-patterns)
 
 ---
 
@@ -1002,6 +1003,272 @@ Verify an OTP code sent via SMS.
 curl -X POST http://localhost:4000/api/sms/verify \
   -H "Content-Type: application/json" \
   -d '{"mobile": "9876543210", "otp": "1234"}'
+```
+
+---
+
+## Settings
+
+Application-level settings — store identity and postal address, support contacts, social links,
+business hours, commerce config, and operational config. Stored one row per *group* in the `Setting`
+table with the group's fields held as JSON, and served from an in-memory config that is only reloaded
+from Postgres when a request asks for it.
+
+Settings are split into two tiers by which object in `src/lib/settingsDefaults.js` declares them:
+
+| Tier | Groups | Endpoint |
+|------|--------|----------|
+| public | `STORE_IDENTITY`, `SUPPORT_CONTACT`, `SOCIAL_LINKS`, `BUSINESS_HOURS`, `COMMERCE_CONFIG` | `GET /api/settings` |
+| private | `NOTIFICATION_CONFIG`, `INTEGRATION_CONFIG` | `GET /api/settings/private` |
+
+**The cache flag:** every endpoint accepts `cache`, as a query param or a JSON body field. Only the
+exact value `'false'` (or boolean `false`) forces a fresh database read; `'true'`, an unrecognised
+value, a repeated param and an absent param all serve the loaded config. Reads respond with
+`Cache-Control: no-store` so the in-process config stays the only cache.
+
+Every response carries a `meta` block reporting whether the payload came from the cache — the one
+place this API deviates from the bare-array/bare-object responses used elsewhere.
+
+**Notes:**
+- Every known group is always present and complete in the response, even when its database row is
+  missing or is missing fields — values are deep-merged over the code defaults.
+- `isPublic` on the row cannot move a group between tiers; the code defaults decide. Sending
+  `isPublic` in a write body has no effect.
+- ⚠️ There is **no HTTP authentication** on any of these endpoints (see
+  [Authentication](#authentication-1) below). "Private" means "not served in the anonymous storefront
+  payload", **not** "access-controlled". Do not store secrets in the `Setting` table — they belong in
+  `.env`.
+
+---
+
+### GET `/api/settings`
+
+Fetch the public settings tier. This is the call the storefront makes on page load.
+
+**Query Parameters:**
+- `cache` (optional): `false` forces a fresh read from Postgres. Any other value, or omitting it, serves the in-memory config.
+
+**Success Response (200):**
+```json
+{
+  "settings": {
+    "STORE_IDENTITY": {
+      "legalName": "Mangal Superfoods Pvt. Ltd.",
+      "displayName": "Mangal Superfoods",
+      "tagline": "Pure, honest superfoods",
+      "logoUrl": "",
+      "gstin": "",
+      "fssaiLicense": "",
+      "address": {
+        "line1": "", "line2": "", "landmark": "",
+        "city": "", "state": "", "pincode": "",
+        "country": "India", "mapUrl": ""
+      }
+    },
+    "SUPPORT_CONTACT": {
+      "email": "support@mangalsuperfoods.com",
+      "salesEmail": "",
+      "phone": "",
+      "whatsapp": "",
+      "supportHoursNote": "Mon-Sat, 10:00-18:00 IST"
+    },
+    "SOCIAL_LINKS": { "instagram": "", "facebook": "", "youtube": "", "x": "", "linkedin": "" },
+    "BUSINESS_HOURS": {
+      "timezone": "Asia/Kolkata",
+      "weekly": {
+        "monday": { "open": "09:00", "close": "18:00", "closed": false },
+        "sunday": { "open": "", "close": "", "closed": true }
+      },
+      "holidays": []
+    },
+    "COMMERCE_CONFIG": {
+      "currency": { "code": "INR", "symbol": "₹", "locale": "en-IN" },
+      "freeShippingThreshold": 999,
+      "shippingFlatRate": 49,
+      "minOrderValue": 0,
+      "maxCartQuantityPerItem": 10,
+      "codEnabled": true,
+      "codFee": 0,
+      "tax": { "pricesIncludeTax": true, "gstPercent": 5 },
+      "returnWindowDays": 7
+    }
+  },
+  "meta": {
+    "scope": "public",
+    "fromCache": true,
+    "loadedAt": "2026-08-11T20:08:19.139Z"
+  }
+}
+```
+
+**Error Responses:**
+- `500` - Failed to fetch: `{ "error": "Failed to fetch settings" }`
+
+**cURL Examples:**
+```bash
+# served from memory
+curl http://localhost:4000/api/settings
+
+# force a fresh read from Postgres and replace the cached config
+curl "http://localhost:4000/api/settings?cache=false"
+```
+
+---
+
+### GET `/api/settings/private`
+
+Fetch the private settings tier. The frontend calls this after a successful login, typically with
+`?cache=false` so it also refreshes the server's config in the same round trip.
+
+**Query Parameters:**
+- `cache` (optional): same semantics as above
+
+**Success Response (200):**
+```json
+{
+  "settings": {
+    "NOTIFICATION_CONFIG": {
+      "orderNotifyEmails": [],
+      "adminWhatsapp": "",
+      "otp": { "length": 4, "expiryMinutes": 5, "resendCooldownSeconds": 60 },
+      "lowStockThreshold": 5
+    },
+    "INTEGRATION_CONFIG": {
+      "whapi": { "enabled": true, "senderLabel": "Mangal Superfoods" },
+      "analytics": { "gaMeasurementId": "", "metaPixelId": "" },
+      "maintenance": { "enabled": false, "message": "" }
+    }
+  },
+  "meta": {
+    "scope": "private",
+    "fromCache": false,
+    "loadedAt": "2026-08-11T20:08:19.139Z"
+  }
+}
+```
+
+**Error Responses:**
+- `500` - Failed to fetch: `{ "error": "Failed to fetch private settings" }`
+
+**cURL Example:**
+```bash
+curl "http://localhost:4000/api/settings/private?cache=false"
+```
+
+---
+
+### PATCH `/api/settings`
+
+Update several settings groups at once. Each value is deep-merged into what is stored, so a partial
+object only changes the fields it names. All groups are written in a single transaction, and the
+in-memory config is refreshed once afterwards.
+
+**Request Body:**
+```json
+{
+  "settings": {
+    "SUPPORT_CONTACT": { "email": "help@mangalsuperfoods.com" },
+    "COMMERCE_CONFIG": { "freeShippingThreshold": 1499, "currency": { "symbol": "Rs." } },
+    "NOTIFICATION_CONFIG": { "lowStockThreshold": 3 }
+  }
+}
+```
+
+**Validation Rules:**
+- `settings`: Required. Non-empty JSON object keyed by settings group key
+- Each key: Required. Must be a known group (see the tier table above)
+- Each value: Required. Must be a JSON object (not a string, number, array or null)
+- Every entry is validated **before** anything is written — one bad key rejects the whole batch, and
+  the request writes nothing
+- `isPublic` in the body is ignored; the tier comes from the code defaults
+- `__proto__`, `constructor` and `prototype` are stripped at every depth before the merge
+
+**Success Response (200):** the effective (merged) values for the groups that were touched
+```json
+{
+  "settings": {
+    "SUPPORT_CONTACT": { "email": "help@mangalsuperfoods.com", "salesEmail": "", "phone": "", "whatsapp": "", "supportHoursNote": "Mon-Sat, 10:00-18:00 IST" },
+    "COMMERCE_CONFIG": { "currency": { "code": "INR", "symbol": "Rs.", "locale": "en-IN" }, "freeShippingThreshold": 1499 },
+    "NOTIFICATION_CONFIG": { "lowStockThreshold": 3 }
+  },
+  "meta": {
+    "updated": 3,
+    "loadedAt": "2026-08-11T20:08:50.383Z"
+  }
+}
+```
+
+**Error Responses:**
+- `400` - Missing or empty `settings` object: `{ "error": "Missing required fields" }`
+- `400` - Unknown group key(s): `{ "error": "Unknown settings keys", "keys": ["NOPE"] }`
+- `400` - Non-object value(s): `{ "error": "Each settings value must be a JSON object", "keys": ["SOCIAL_LINKS"] }`
+- `500` - Failed to update: `{ "error": "Failed to update settings" }`
+
+**cURL Example:**
+```bash
+curl -X PATCH http://localhost:4000/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "settings": {
+      "SUPPORT_CONTACT": { "email": "help@mangalsuperfoods.com" },
+      "COMMERCE_CONFIG": { "freeShippingThreshold": 1499 }
+    }
+  }'
+```
+
+---
+
+### PUT `/api/settings/:key`
+
+Update a single settings group. Identical merge and validation behaviour to `PATCH /api/settings` —
+this is the convenience form for one group.
+
+**URL Parameters:**
+- `key`: Required. A known settings group key, e.g. `COMMERCE_CONFIG`
+
+**Request Body:**
+```json
+{
+  "value": {
+    "freeShippingThreshold": 1499,
+    "currency": { "symbol": "Rs." }
+  }
+}
+```
+
+**Validation Rules:**
+- `key`: Required. Must be a known group
+- `value`: Required. Must be a JSON object (not a string, number, array or null)
+- Nested objects merge; arrays and scalars replace wholesale
+- A `null` field falls back to the code default rather than storing null
+
+**Success Response (200):**
+```json
+{
+  "settings": {
+    "COMMERCE_CONFIG": {
+      "currency": { "code": "INR", "symbol": "Rs.", "locale": "en-IN" },
+      "freeShippingThreshold": 1499,
+      "tax": { "pricesIncludeTax": true, "gstPercent": 5 }
+    }
+  },
+  "meta": {
+    "updated": 1,
+    "loadedAt": "2026-08-11T20:08:50.305Z"
+  }
+}
+```
+
+**Error Responses:**
+- `400` - `value` missing or not an object: `{ "error": "Missing required fields" }`
+- `404` - Unknown group: `{ "error": "Unknown settings key" }`
+- `500` - Failed to update: `{ "error": "Failed to update setting" }`
+
+**cURL Example:**
+```bash
+curl -X PUT http://localhost:4000/api/settings/COMMERCE_CONFIG \
+  -H "Content-Type: application/json" \
+  -d '{"value": {"freeShippingThreshold": 1499, "currency": {"symbol": "Rs."}}}'
 ```
 
 ---

@@ -10,6 +10,7 @@ import couponsRouter from './src/routes/coupons.js';
 import usersRouter from './src/routes/users.js';
 import authRouter from './src/routes/auth.js';
 import smsRouter from './src/routes/sms.js';
+import settingsRouter from './src/routes/settings.js';
 
 // Comma-separated list of allowed origins, e.g. "http://localhost:3000,https://mangalsuperfoods.com"
 const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:3000')
@@ -40,6 +41,7 @@ app.use('/api/coupons', couponsRouter);
 app.use('/api/users', usersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/sms', smsRouter);
+app.use('/api/settings', settingsRouter);
 
 // Fallback error handler (route handlers already catch their own errors,
 // this only catches anything unexpected e.g. malformed JSON bodies).
